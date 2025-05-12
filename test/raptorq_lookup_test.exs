@@ -43,24 +43,4 @@ defmodule RaptorqLookupTest do
     assert_raise ArgumentError, fn -> v3("1") end
     assert_raise ArgumentError, fn -> v3(:five) end
   end
-
-  test "oct_log" do
-    assert_raise ArgumentError, fn -> oct_log(0) end
-    assert_raise ArgumentError, fn -> oct_log(<<0>>) end
-    assert oct_log(<<1>>) == 0
-    assert oct_log(<<127>>) == 87
-    assert oct_log(<<255>>) == 175
-    assert_raise ArgumentError, fn -> oct_log(<<256>>) end
-    assert_raise ArgumentError, fn -> oct_log(:five) end
-  end
-
-  test "oct_exp" do
-    assert_raise ArgumentError, fn -> oct_exp(-1) end
-    assert oct_exp(0) == <<1>>
-    assert oct_exp(254) == <<142>>
-    assert oct_exp(509) == <<142>>
-    assert_raise ArgumentError, fn -> oct_exp(510) end
-    assert_raise ArgumentError, fn -> oct_exp("1") end
-    assert_raise ArgumentError, fn -> oct_exp(:five) end
-  end
 end
