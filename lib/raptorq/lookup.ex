@@ -30,4 +30,42 @@ defmodule Raptorq.Lookup do
 
     def unquote(which)(bi), do: raise(ArgumentError, "Invalid index: #{bi}")
   end
+
+  @doc """
+  Octet log table lookup.
+  Returns an integer in the OCT_LOG table for the provided octet
+  <<0>> is expliticly not supported
+  """
+  # At some point we may want to use more Erlang magic to work with
+  # the binary data more directly in these octect tables
+  def oct_log(octet)
+
+  :code.priv_dir(:raptorq)
+  |> Path.join("OCT_LOG.entries")
+  |> File.read!()
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.to_integer/1)
+  |> Enum.with_index(fn v, i ->
+    def oct_log(<<unquote(i + 1)>>), do: unquote(v)
+  end)
+
+  def oct_log(bi), do: raise(ArgumentError, "Invalid octect: #{bi}")
+
+  @doc """
+  Octet exp table lookup.
+  Returns the octect in the OCT_EXP table at the given index.
+  Valid indices are in the range 0..509
+  """
+  def oct_exp(index)
+
+  :code.priv_dir(:raptorq)
+  |> Path.join("OCT_EXP.entries")
+  |> File.read!()
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.to_integer/1)
+  |> Enum.with_index(fn v, i ->
+    def oct_exp(unquote(i)), do: <<unquote(v)>>
+  end)
+
+  def oct_exp(bi), do: raise(ArgumentError, "Invalid index: #{bi}")
 end
