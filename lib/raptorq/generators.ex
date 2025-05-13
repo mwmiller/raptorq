@@ -129,4 +129,45 @@ defmodule Raptorq.Generators do
     raise ArgumentError,
           "Invalid arguments for tuple function. Integer for k_prime (#{k_prime}) and x (#{x})."
   end
+
+  @doc """
+    Generates the encoded symbol for a given k_prime and intermediate symbols.
+  """
+  def enc(k_prime, symbols, {d, a, b, d1, a1, b1}) do
+    %{l: l, w: w, p: p, p1: p1} = SIOP.values_for(k_prime, :exact)
+
+    if tuple_size(symbols) != l do
+      raise ArgumentError,
+            "Invalid arguments for enc function. Tuple size must be equal to l (#{l})."
+    end
+
+    pb1 = move_down(b1, a1, p, p1)
+
+    symbols
+    |> elem(b)
+    |> primary_result(b, a, w, symbols, d - 1)
+    |> then(fn res -> res + elem(symbols, w + pb1) end)
+    |> secondary_result(pb1, a1, p1, p, w, symbols, d1 - 1)
+  end
+
+  # I tried to use a Y-combinator here but it didn't work out.
+  defp move_down(b1, _a1, p, _p1) when b1 < p, do: b1
+
+  defp move_down(b1, a1, p, p1) do
+    move_down(rem(b1 + a1, p1), a1, p, p1)
+  end
+
+  defp primary_result(res, _, _, _, _, 0), do: res
+
+  defp primary_result(res, prev_idx, a, w, symbols, remaining) do
+    idx = rem(prev_idx + a, w)
+    primary_result(res + elem(symbols, idx), idx, a, w, symbols, remaining - 1)
+  end
+
+  defp secondary_result(res, _, _, _, _, _, _, 0), do: res
+
+  defp secondary_result(res, prev_idx, a1, p1, p, w, symbols, remaining) do
+    idx = rem(prev_idx + a1, p1) |> move_down(a1, p, p1)
+    secondary_result(res + elem(symbols, w + idx), idx, a1, p1, p, w, symbols, remaining - 1)
+  end
 end
