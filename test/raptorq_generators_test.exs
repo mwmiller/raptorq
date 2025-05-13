@@ -36,4 +36,13 @@ defmodule RaptorqGeneratorsTest do
     assert deg(1_017_662, 1777) == 29
     assert_raise ArgumentError, fn -> deg(1_017_662, 1_234_567) end
   end
+
+  test "tuple" do
+    assert_raise ArgumentError, fn -> tuple(-1, 1) end
+    assert_raise ArgumentError, fn -> tuple(9, 10) end
+    assert tuple(10, 10) == {1, 15, 15, 2, 10, 7}
+    assert tuple(10, 0) == {1, 4, 9, 2, 5, 1}
+    assert tuple(18, 10) == {17, 26, 16, 2, 10, 7}
+    assert tuple(1777, 10) == {2, 1763, 1006, 2, 66, 55}
+  end
 end

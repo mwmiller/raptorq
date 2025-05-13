@@ -86,4 +86,52 @@ defmodule Raptorq.Generators do
     raise ArgumentError,
           "Invalid arguments for rand function. Non-negative integer for y (#{y}), i in 0..255 (#{i}) and a positive integer for m (#{m})."
   end
+
+  @doc """
+  Generates a Tuple per RFC 6330, Section 5.3.5.4
+    Returns { d, a, b, d1, a1, b1}
+
+
+    ## Parameters
+    - `k_prime`: source symbols in the extended source block
+    - `x`: an ISI
+  """
+  def tuple(k_prime, x) when is_integer(k_prime) and is_integer(x) do
+    %{j: j, s: s, h: h, w: w} = SIOP.values_for(k_prime, :exact)
+    # It my well be that these values should be accessible from the
+    # SIOP table we could compute them once there
+    # Wait and see attitude for now
+    l = k_prime + s + h
+    [p1] = Primacy.primes_near(l - w, dir: :above, count: 1)
+    a_0 = 53591 + j * 997
+
+    a_even =
+      case rem(x, 2) do
+        0 -> a_0
+        _ -> a_0 + 1
+      end
+
+    b = 10267 * (j + 1)
+    y = rem(b + x * a_even, 2 ** 32)
+    v = rand(y, 0, 2 ** 20)
+    d = deg(v, k_prime)
+    a = 1 + rand(y, 1, w - 1)
+    b = rand(y, 2, w)
+
+    d1 =
+      case d < 4 do
+        true -> 2 + rand(x, 3, 2)
+        false -> 2
+      end
+
+    a1 = 1 + rand(x, 4, p1 - 1)
+    b1 = rand(x, 5, p1)
+
+    {d, a, b, d1, a1, b1}
+  end
+
+  def tuple(k_prime, x) do
+    raise ArgumentError,
+          "Invalid arguments for tuple function. Integer for k_prime (#{k_prime}) and x (#{x})."
+  end
 end
