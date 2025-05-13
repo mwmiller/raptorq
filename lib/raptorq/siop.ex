@@ -7,67 +7,52 @@ defmodule Raptorq.SIOP do
   # I mostly want to see it work and see what happens.
   @key_re ~r/\s(?<k>\d+)\s.*\s(?<j>\d+)\s.*\s(?<s>\d+)\s.*\s(?<h>\d+)\s.*\s(?<w>\d+)\s/
 
-  @value_map :code.priv_dir(:raptorq)
-             |> Path.join("SIOP.table")
-             |> File.read!()
-             |> String.split("\n", trim: true)
-             |> Enum.reduce(%{}, fn line, acc ->
-               case Regex.named_captures(@key_re, line) do
-                 nil ->
-                   acc
+  @value_maps :code.priv_dir(:raptorq)
+              |> Path.join("SIOP.table")
+              |> File.read!()
+              |> String.split("\n", trim: true)
+              |> Enum.reduce([], fn line, acc ->
+                case Regex.named_captures(@key_re, line) do
+                  nil ->
+                    acc
 
-                 %{"k" => k, "j" => j, "s" => s, "h" => h, "w" => w} ->
-                   Map.merge(acc, %{
-                     String.to_integer(k) => %{
-                       j: String.to_integer(j),
-                       s: String.to_integer(s),
-                       h: String.to_integer(h),
-                       w: String.to_integer(w),
-                       k: String.to_integer(k)
-                     }
-                   })
-               end
-             end)
-
-  # This appear reptitive, but I want to maintian flexibility
-  # and I don't want to use macros for this until I am sure
-  @doc """
-  Returns the J value for the given K' value.
-  """
-  def j(k_prime) do
-    case Map.get(@value_map, k_prime) do
-      %{j: j} -> j
-      nil -> raise(ArgumentError, "Invalid k: #{k_prime}")
-    end
-  end
+                  %{"k" => k, "j" => j, "s" => s, "h" => h, "w" => w} ->
+                    [
+                      {String.to_integer(k),
+                       %{
+                         k: String.to_integer(k),
+                         j: String.to_integer(j),
+                         s: String.to_integer(s),
+                         h: String.to_integer(h),
+                         w: String.to_integer(w)
+                       }}
+                      | acc
+                    ]
+                end
+              end)
+              |> Enum.reverse()
 
   @doc """
-  Returns the S value for the given K' value.
-  """
-  def s(k_prime) do
-    case Map.get(@value_map, k_prime) do
-      %{s: s} -> s
-      nil -> raise(ArgumentError, "Invalid k: #{k_prime}")
-    end
-  end
+  Returns the SIOP parameters for a given k value.
 
-  @doc """
-  Returns the H value for the given K' value.
+  Available strategies:
+  - `:exact`: Returns the exact match for k.
+  - `:close`: Returns the closest match for k which is greater than or equal to k.
   """
-  def h(k_prime) do
-    case Map.get(@value_map, k_prime) do
-      %{h: h} -> h
-      nil -> raise(ArgumentError, "Invalid k: #{k_prime}")
-    end
-  end
+  def values_for(k, strategy \\ :exact) do
+    match_fn =
+      case strategy do
+        :exact -> fn x -> x == k end
+        :close -> fn x -> x >= k end
+        _ -> fn _ -> false end
+      end
 
-  @doc """
-  Returns the W value for the given K' value.
-  """
-  def w(k_prime) do
-    case Map.get(@value_map, k_prime) do
-      %{w: w} -> w
-      nil -> raise(ArgumentError, "Invalid k: #{k_prime}")
+    case Enum.find(@value_maps, fn {k_val, _} -> match_fn.(k_val) end) do
+      {_, params} ->
+        params
+
+      nil ->
+        raise(ArgumentError, "No SIOP parameters found for k = #{k} with strategy #{strategy}")
     end
   end
 end

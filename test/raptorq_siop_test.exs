@@ -3,55 +3,22 @@ defmodule RaptorqSIOPTest do
   doctest Raptorq.SIOP
   import Raptorq.SIOP
 
-  test "j" do
-    assert_raise ArgumentError, fn -> j(9) end
-    assert j(10) == 254
-    assert j(217) == 764
-    assert j(549) == 497
-    assert j(1777) == 860
-    assert j(7855) == 332
-    assert j(23491) == 121
-    assert j(48007) == 269
-    assert j(56403) == 471
-    assert_raise ArgumentError, fn -> j(56404) end
-  end
+  test "values_for" do
+    assert values_for(9, :close) == %{k: 10, j: 254, s: 7, h: 10, w: 17}
+    assert values_for(10, :exact) == %{k: 10, j: 254, s: 7, h: 10, w: 17}
+    assert values_for(10, :close) == %{k: 10, j: 254, s: 7, h: 10, w: 17}
+    assert values_for(217) == %{k: 217, j: 764, s: 29, h: 10, w: 233}
+    assert values_for(214, :close) == %{k: 217, j: 764, s: 29, h: 10, w: 233}
+    assert values_for(549) == %{k: 549, j: 497, s: 41, h: 10, w: 563}
+    assert values_for(1777) == %{k: 1777, j: 860, s: 79, h: 11, w: 1801}
+    assert values_for(7855) == %{k: 7855, j: 332, s: 211, h: 11, w: 7937}
+    assert values_for(23491) == %{k: 23491, j: 121, s: 457, h: 13, w: 23719}
+    assert values_for(48007) == %{k: 48007, j: 269, s: 787, h: 15, w: 48463}
+    assert values_for(56402, :close) == %{k: 56403, j: 471, s: 907, h: 16, w: 56951}
+    assert values_for(56403) == %{k: 56403, j: 471, s: 907, h: 16, w: 56951}
 
-  test "s" do
-    assert_raise ArgumentError, fn -> s(9) end
-    assert s(10) == 7
-    assert s(217) == 29
-    assert s(549) == 41
-    assert s(1777) == 79
-    assert s(7855) == 211
-    assert s(23491) == 457
-    assert s(48007) == 787
-    assert s(56403) == 907
-    assert_raise ArgumentError, fn -> s(56404) end
-  end
-
-  test "h" do
-    assert_raise ArgumentError, fn -> h(9) end
-    assert h(10) == 10
-    assert h(217) == 10
-    assert h(549) == 10
-    assert h(1777) == 11
-    assert h(7855) == 11
-    assert h(23491) == 13
-    assert h(48007) == 15
-    assert h(56403) == 16
-    assert_raise ArgumentError, fn -> h(56404) end
-  end
-
-  test "w" do
-    assert_raise ArgumentError, fn -> w(9) end
-    assert w(10) == 17
-    assert w(217) == 233
-    assert w(549) == 563
-    assert w(1777) == 1801
-    assert w(7855) == 7937
-    assert w(23491) == 23719
-    assert w(48007) == 48463
-    assert w(56403) == 56951
-    assert_raise ArgumentError, fn -> w(56404) end
+    assert_raise ArgumentError, fn -> values_for(56404) end
+    assert_raise ArgumentError, fn -> values_for(56404, :close) end
+    assert_raise ArgumentError, fn -> values_for(9, :exact) end
   end
 end
