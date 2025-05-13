@@ -97,12 +97,7 @@ defmodule Raptorq.Generators do
     - `x`: an ISI
   """
   def tuple(k_prime, x) when is_integer(k_prime) and is_integer(x) do
-    %{j: j, s: s, h: h, w: w} = SIOP.values_for(k_prime, :exact)
-    # It my well be that these values should be accessible from the
-    # SIOP table we could compute them once there
-    # Wait and see attitude for now
-    l = k_prime + s + h
-    [p1] = Primacy.primes_near(l - w, dir: :above, count: 1)
+    %{j: j, w: w, p1: p1} = SIOP.values_for(k_prime, :exact)
     a_0 = 53591 + j * 997
 
     a_even =

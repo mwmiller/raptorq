@@ -17,15 +17,21 @@ defmodule Raptorq.SIOP do
                     acc
 
                   %{"k" => k, "j" => j, "s" => s, "h" => h, "w" => w} ->
+                    # Pre-coding relationships from RFC 6330 Section 5.3.3.3
+                    ik = String.to_integer(k)
+                    ij = String.to_integer(j)
+                    is = String.to_integer(s)
+                    ih = String.to_integer(h)
+                    iw = String.to_integer(w)
+                    il = ik + is + ih
+                    ip = il - iw
+                    [ip1] = Primacy.primes_near(ip, dir: :above, count: 1)
+                    iu = ip - ih
+                    ib = iw - is
+
                     [
-                      {String.to_integer(k),
-                       %{
-                         k: String.to_integer(k),
-                         j: String.to_integer(j),
-                         s: String.to_integer(s),
-                         h: String.to_integer(h),
-                         w: String.to_integer(w)
-                       }}
+                      {ik,
+                       %{k: ik, j: ij, s: is, h: ih, w: iw, l: il, p: ip, p1: ip1, u: iu, b: ib}}
                       | acc
                     ]
                 end
