@@ -8,13 +8,16 @@ defmodule Raptorq.Generators do
   import Raptorq.Lookup
   alias Raptorq.SIOP
 
-  @key_re ~r/(?<i0>\d+)[^\d]+(?<f0>\d+)[^\d]+((?<i1>\d+)[^\d]+(?<f1>\d+))?\s/
+  # Regex cannot be module attributes as of Elixir 1.19
+  # This is kept as a "once used variable" for clarity.
+  key_re = ~r/(?<i0>\d+)[^\d]+(?<f0>\d+)[^\d]+((?<i1>\d+)[^\d]+(?<f1>\d+))?\s/
+
   @degrees :code.priv_dir(:raptorq)
            |> Path.join("Deg.table")
            |> File.read!()
            |> String.split("\n", trim: true)
            |> Enum.reduce([], fn line, acc ->
-             case Regex.named_captures(@key_re, line) do
+             case Regex.named_captures(key_re, line) do
                # Last line special case
                %{"i0" => i0, "f0" => f0, "i1" => "", "f1" => ""} ->
                  [{String.to_integer(f0), String.to_integer(i0)} | acc]

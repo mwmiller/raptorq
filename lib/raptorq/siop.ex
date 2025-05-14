@@ -3,16 +3,17 @@ defmodule Raptorq.SIOP do
   Standard Indices and Other Parameters (SIOP) for RaptorQ.
   """
 
-  # At this point, I don't know if this is the correct implementation.
-  # I mostly want to see it work and see what happens.
-  @key_re ~r/\s(?<k>\d+)\s.*\s(?<j>\d+)\s.*\s(?<s>\d+)\s.*\s(?<h>\d+)\s.*\s(?<w>\d+)\s/
+  # This used to be a module attribute, but Elixir 1.19 deprecates this
+  # due to changes in OTP-28 in how regexes are compiled.
+  # I only use it once, but I mostly do it for the naming and clarity.
+  key_re = ~r/\s(?<k>\d+)\s.*\s(?<j>\d+)\s.*\s(?<s>\d+)\s.*\s(?<h>\d+)\s.*\s(?<w>\d+)\s/
 
   @value_maps :code.priv_dir(:raptorq)
               |> Path.join("SIOP.table")
               |> File.read!()
               |> String.split("\n", trim: true)
               |> Enum.reduce([], fn line, acc ->
-                case Regex.named_captures(@key_re, line) do
+                case Regex.named_captures(key_re, line) do
                   nil ->
                     acc
 
