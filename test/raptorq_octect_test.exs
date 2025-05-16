@@ -51,4 +51,20 @@ defmodule RaptorqOctetTest do
     assert_raise ArgumentError, fn -> oexp("1") end
     assert_raise ArgumentError, fn -> oexp(:five) end
   end
+
+  test "sadd" do
+    assert sadd(<<1>>, <<0>>) == <<1>>
+    assert sadd(<<1, 2, 3>>, <<2, 3, 4>>) == <<3, 1, 7>>
+    assert sadd(<<255, 254>>, <<1, 2>>) == <<254, 252>>
+    assert_raise ArgumentError, fn -> sadd(255, <<2>>) end
+    assert_raise ArgumentError, fn -> sadd(<<255, 254>>, 2) end
+  end
+
+  test "smul" do
+    assert smul(<<1>>, <<0>>) == <<0>>
+    assert smul(<<1, 2, 3>>, <<2>>) == <<2, 4, 6>>
+    assert smul(<<255, 254>>, <<1>>) == <<255, 254>>
+    assert_raise ArgumentError, fn -> smul(255, <<2>>) end
+    assert_raise ArgumentError, fn -> smul(<<255, 254>>, 2) end
+  end
 end
