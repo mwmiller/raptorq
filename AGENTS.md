@@ -239,3 +239,41 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 
 <!-- usage_rules:elixir-end -->
 <!-- usage-rules-end -->
+
+<!-- usage_rules:raptorq-start -->
+## usage_rules:raptorq usage
+# RaptorQ Usage Rules
+
+## Encode Preconditions
+
+- **Data length must be exact multiple of `symbol_size`** — `Raptorq.encode/2` does not pad. Caller must ensure `byte_size(data) % symbol_size == 0`. Use `Raptorq.encode/3` for automatic chunking.
+- **`symbol_size >= 2`** — `symbol_size = 1` panics (cberner Rust constraint).
+- Returns `{:ok, state}` where `state.c` = **intermediate symbols** `C[0..K'-1]`, NOT source symbols.
+
+## Repair ISI Semantics
+
+- `Raptorq.repair(c, params, isi)` takes **Intermediate Symbol Identifier (ISI)**.
+- Source symbols: ISI `0..K-1` where `K = params.k - params.s - params.h`.
+- Repair symbols: ISI `params.k..infinity` (i.e., `K' + offset`).
+- cberner `repair_packets(start, n)` → ISIs `params.k + start .. params.k + start + n - 1`.
+
+## Decode Preconditions
+
+- All received symbols must have identical `byte_size` — mixed sizes return `{:error, :inconsistent_symbol_size}`.
+- Returns `{:ok, binary}` on success, `{:error, reason}` on failure.
+
+## Parameter Distinction: K vs K'
+
+- `params.k` = K' = intermediate symbol count (includes LDPC/HDPC padding)
+- `params.k - params.s - params.h` = K = original source symbol count
+- Source ISIs: `0..K-1`; Repair ISIs start at `K'`
+
+## Interop with cberner/raptorq 2.x
+
+Verified conformant under:
+- `sub_blocks = 1`, `symbol_alignment = 1`
+- Data length exact multiple of `symbol_size`, `symbol_size >= 2`
+- Shared ISI space: source `0..K-1`, repair `K'..∞`
+
+Reference vectors: `test/fixtures/cberner_interop_vectors.txt` + `test/raptorq_interop_test.exs`.
+<!-- usage_rules:raptorq-end -->

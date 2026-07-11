@@ -46,7 +46,7 @@ defmodule Raptorq.MixProject do
   defp usage_rules do
     [
       file: "AGENTS.md",
-      usage_rules: [:usage_rules, :elixir]
+      usage_rules: [:usage_rules, :elixir, :raptorq]
     ]
   end
 
