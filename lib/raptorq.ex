@@ -4,19 +4,22 @@ defmodule Raptorq do
 
   ## Quick start
 
-      # Encode: split data into K symbols and compute intermediate symbols C
+      # Encode: chunk data into K symbols of size `sym_size` (pads if necessary)
       data = File.read!("myfile.dat")
-      {:ok, state} = Raptorq.encode(data, 10)
+      k = 10
+      sym_size = ceil(byte_size(data) / k)
+      {:ok, state} = Raptorq.encode(data, k, sym_size)
 
       # Generate repair symbols for any ISI ≥ K'
       c = Map.get(state, :c)
       p = Map.get(state, :params)
       repair_1 = Raptorq.repair(c, p, 100_000)
-      repair_2 = Raptorq.repair(c, p, 100_001)
 
-      # Decode: recover from any K' of the (source + repair) symbols
-      received = [{0, sym_0}, {3, sym_3}, {100_000, repair_1} | ...]
-      {:ok, data} = Raptorq.decode(received, 10, byte_size(data))
+      # Decode: recover data gracefully using the StreamingDecoder
+      decoder = Raptorq.StreamingDecoder.new(k, byte_size(data))
+      {:ok, :incomplete, decoder} = Raptorq.StreamingDecoder.add_symbol(decoder, 0, sym_0)
+      # ... receive more symbols ...
+      {:ok, {:decoded, data}, _decoder} = Raptorq.StreamingDecoder.add_symbol(decoder, 100_000, repair_1)
 
   ## Architecture
 
