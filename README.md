@@ -127,23 +127,15 @@ symbols per block. No return channel needed.
 
 ## Performance
 
-| Block Size | 5-Phase Sparse Solver |
-|------------|-----------------------|
-| K=10   L=27 | ~1 ms |
-| K=200  L=233 | ~320 ms |
-| K=500  L=558 | ~3.7 s |
-| K=1000 L=1071 | ~23 s |
+The following benchmarks measure the raw decoding/solver time (`Raptorq.decode/3`) using Elixir's `:timer.tc` on a single process. Since the 5-phase sparse solver runs in pure Elixir, time scales quadratically with $L$ (which is proportional to $K$). 
 
-## Tests
+*Run on a single core; to reproduce, you can generate an array of received symbols (e.g. `needed = L - S - H`) and pass them to the decoder.*
 
-```bash
-mix test
-```
-
-## Pre-commit Checks
-
-```bash
-mix precommit
-```
-
-Runs format check, Credo strict, and compilation with warnings-as-errors.
+| Block Size | L | 5-Phase Sparse Solver |
+|------------|---|-----------------------|
+| K=10   | 27  | ~2.0 ms |
+| K=50   | 78  | ~36 ms |
+| K=100  | 128 | ~160 ms |
+| K=200  | 233 | ~1.0 s |
+| K=300  | 340 | ~3.5 s |
+| K=400  | 452 | ~8.7 s |
