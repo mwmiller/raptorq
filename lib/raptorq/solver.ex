@@ -47,9 +47,7 @@ defmodule Raptorq.Solver do
     solver = %__MODULE__{A: a, D: d_symbols, L: l, params: params}
 
     case execute(solver) do
-      {:ok, solver} ->
-        d = Map.get(solver, :D)
-
+      {:ok, %{D: d} = solver} ->
         if opts[:debug] do
           {:ok, d, solver}
         else

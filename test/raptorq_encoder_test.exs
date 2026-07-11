@@ -52,15 +52,15 @@ defmodule RaptorqEncoderTest do
     data = :crypto.strong_rand_bytes(100)
     k = 10
 
-    assert {:ok, result} = Raptorq.encode(data, k)
-    assert Map.get(result, :k_prime) >= k
-    assert length(Map.get(result, :c)) == Map.get(result, :params).l
-    assert length(Map.get(result, :source_symbols)) == k
-    assert Map.get(result, :symbol_size) == 10
+    assert {:ok, %{k_prime: kp, c: c, params: params, source_symbols: src, symbol_size: sz}} =
+             Raptorq.encode(data, k)
 
-    # Repair symbols should have correct size
-    repair = Raptorq.repair(Map.get(result, :c), Map.get(result, :params),
-              Map.get(result, :symbol_size), 999)
+    assert kp >= k
+    assert length(c) == params.l
+    assert length(src) == k
+    assert sz == 10
+
+    repair = Raptorq.repair(c, params, sz, 999)
     assert byte_size(repair) == 10
   end
 
