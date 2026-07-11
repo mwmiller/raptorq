@@ -38,8 +38,12 @@ defmodule Raptorq.MixProject do
 
   defp aliases do
     [
-      compile: ["compile --warnings-as-errors", "format", "credo --strict"],
-      precommit: ["format --check-formatted", "credo --strict", "compile --warnings-as-errors"]
+      compile: ["compile --force --warnings-as-errors", "format", "credo --strict"],
+      precommit: [
+        "format --check-formatted",
+        "credo --strict",
+        "compile --force --warnings-as-errors"
+      ]
     ]
   end
 
