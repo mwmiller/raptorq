@@ -35,6 +35,7 @@ defmodule RaptorqConstraintMatrixTest do
 
     for i <- 0..(s - 1) do
       row = Enum.at(rows, i)
+
       for {_col, val} <- row do
         assert val == <<1>>, "LDPC row #{i} has non-unity value #{inspect(val)}"
       end
@@ -47,10 +48,13 @@ defmodule RaptorqConstraintMatrixTest do
 
     for i <- 0..(s - 1) do
       row = Enum.at(rows, i)
+
       assert row[b + i] == <<1>>,
              "LDPC row #{i} missing I_S at column #{b + i}"
+
       assert row[w + rem(i, p)] == <<1>>,
              "LDPC row #{i} missing G_LDPC,2 at column #{w + rem(i, p)}"
+
       assert row[w + rem(i + 1, p)] == <<1>>,
              "LDPC row #{i} missing G_LDPC,2 at column #{w + rem(i + 1, p)}"
     end
@@ -63,10 +67,12 @@ defmodule RaptorqConstraintMatrixTest do
 
     for i <- 0..(h - 1) do
       row = Enum.at(rows, s + i)
+
       for j <- 0..(h - 1) do
         col = kps + j
         expected = if j == i, do: <<1>>, else: <<0>>
         actual = Map.get(row, col, <<0>>)
+
         assert actual == expected,
                "HDPC row #{i} col #{col}: expected #{inspect(expected)}, got #{inspect(actual)}"
       end
@@ -79,6 +85,7 @@ defmodule RaptorqConstraintMatrixTest do
 
     for i <- 0..(k - 1) do
       row = Enum.at(rows, s + h + i)
+
       for {_col, val} <- row do
         assert val == <<1>>, "G_ENC row #{i} has non-unity value #{inspect(val)}"
       end
@@ -107,9 +114,11 @@ defmodule RaptorqConstraintMatrixTest do
     {partial_rows, _} = ConstraintMatrix.build(10, [0, 5])
 
     assert length(partial_rows) == s + h + 2
+
     for i <- 0..(s + h - 1) do
       assert Enum.at(partial_rows, i) == Enum.at(full_rows, i)
     end
+
     assert Enum.at(partial_rows, s + h) == Enum.at(full_rows, s + h)
     assert Enum.at(partial_rows, s + h + 1) == Enum.at(full_rows, s + h + 5)
   end
@@ -119,14 +128,17 @@ defmodule RaptorqConstraintMatrixTest do
     %{s: s, h: h, k: k} = params
     kps = k + s
 
-    ldpc_entries = Enum.reduce(0..(s - 1), 0, fn i, acc ->
-      acc + map_size(Enum.at(rows, i))
-    end)
+    ldpc_entries =
+      Enum.reduce(0..(s - 1), 0, fn i, acc ->
+        acc + map_size(Enum.at(rows, i))
+      end)
+
     avg_ldpc = ldpc_entries / max(s, 1)
 
     for i <- 0..(h - 1) do
       row = Enum.at(rows, s + i)
       ghdcp_count = Enum.count(row, fn {col, _} -> col < kps end)
+
       assert ghdcp_count > avg_ldpc,
              "HDPC row #{i} density (#{ghdcp_count}) should exceed avg LDPC (#{avg_ldpc})"
     end

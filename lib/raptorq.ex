@@ -11,9 +11,8 @@ defmodule Raptorq do
       # Generate repair symbols for any ISI ≥ K'
       c = Map.get(state, :c)
       p = Map.get(state, :params)
-      sz = Map.get(state, :symbol_size)
-      repair_1 = Raptorq.repair(c, p, sz, 100_000)
-      repair_2 = Raptorq.repair(c, p, sz, 100_001)
+      repair_1 = Raptorq.repair(c, p, 100_000)
+      repair_2 = Raptorq.repair(c, p, 100_001)
 
       # Decode: recover from any K' of the (source + repair) symbols
       received = [{0, sym_0}, {3, sym_3}, {100_000, repair_1} | ...]
@@ -33,12 +32,11 @@ defmodule Raptorq do
 
   ## Performance
 
-  The current solver uses dense Gauss-Jordan (O(L³) + list-access
-  overhead).  Suitable for K ≤ 500.  See `Raptorq.Solver` for details
-  and the planned 5-phase sparse solver.
+  Uses the 5-phase sparse solver (`Raptorq.Solver`) for efficient
+  O(L²) decoding of the intermediate symbols C.
   """
 
-  alias Raptorq.{ConstraintMatrix, Solver, Encoder, Decoder, SIOP}
+  alias Raptorq.{ConstraintMatrix, Decoder, Encoder, SIOP, Solver}
 
   @doc """
   Encode source data for block of K source symbols.
@@ -56,21 +54,22 @@ defmodule Raptorq do
     kp = SIOP.values_for(k, :close).k
     {:ok, c_syms, params} = compute_intermediate(source_syms, k, kp, sym_size)
 
-    {:ok, %{c: c_syms, params: params, symbol_size: sym_size, k_prime: kp,
-            source_symbols: source_syms}}
+    {:ok,
+     %{c: c_syms, params: params, symbol_size: sym_size, k_prime: kp, source_symbols: source_syms}}
   end
 
   @doc """
   Generate one repair symbol for the given ISI.
 
   `c_syms` is the list of L intermediate symbols.
-  `params` is the SIOP parameter map.
-  `sym_size` is the symbol size in bytes.
-  `isi` is the encoding symbol ID (must be >= K' for repair symbols).
+  `params` is the SIOP parameter map produced by `encode/2`.
+  `isi` is the encoding symbol ID (any non-negative integer; use
+  ISIs ≥ K' for true repair symbols, or < K' to regenerate source
+  symbols). The symbol size is inferred from `c_syms`.
 
   Returns the repair symbol as a binary.
   """
-  def repair(c_syms, params, _sym_size, isi) do
+  def repair(c_syms, params, isi) do
     Encoder.encode_symbol(c_syms, params, isi)
   end
 
@@ -111,7 +110,7 @@ defmodule Raptorq do
     # Build constraint matrix
     {constraint_rows, params} = ConstraintMatrix.build(kp)
 
-    # Solve A*C = D
+    # Solve A*C = D using 5-phase sparse solver
     case Solver.solve(constraint_rows, params, d_syms) do
       {:ok, c_syms} -> {:ok, c_syms, params}
       {:error, reason} -> {:error, reason}

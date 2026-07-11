@@ -1,13 +1,9 @@
 defmodule Raptorq.Generators do
-  @moduledoc """
-  This module contains functions defined in RFC 6330 for generating
-  various required parameters.
-  """
+  @moduledoc false
 
-import Bitwise
-import Raptorq.Lookup
-alias Raptorq.SIOP
-alias Raptorq.Octet
+  import Bitwise
+  import Raptorq.Lookup
+  alias Raptorq.{Octet, SIOP}
 
   # Regex cannot be module attributes as of Elixir 1.19
   # This is kept as a "once used variable" for clarity.
@@ -101,16 +97,11 @@ alias Raptorq.Octet
   """
   def tuple(k_prime, x) when is_integer(k_prime) and is_integer(x) do
     %{j: j, w: w, p1: p1} = SIOP.values_for(k_prime, :exact)
-    a_0 = 53591 + j * 997
+    a_0 = 53_591 + j * 997
+    a_val = if rem(a_0, 2) == 0, do: a_0 + 1, else: a_0
 
-    a_even =
-      case rem(x, 2) do
-        0 -> a_0
-        _ -> a_0 + 1
-      end
-
-    b = 10267 * (j + 1)
-    y = rem(b + x * a_even, 2 ** 32)
+    b = 10_267 * (j + 1)
+    y = rem(b + x * a_val, 2 ** 32)
     v = rand(y, 0, 2 ** 20)
     d = deg(v, k_prime)
     a = 1 + rand(y, 1, w - 1)
@@ -174,6 +165,16 @@ alias Raptorq.Octet
 
   defp secondary_result(res, prev_idx, a1, p1, p, w, symbols, remaining) do
     idx = rem(prev_idx + a1, p1) |> move_down(a1, p, p1)
-    secondary_result(Octet.sadd(res, Enum.at(symbols, w + idx)), idx, a1, p1, p, w, symbols, remaining - 1)
+
+    secondary_result(
+      Octet.sadd(res, Enum.at(symbols, w + idx)),
+      idx,
+      a1,
+      p1,
+      p,
+      w,
+      symbols,
+      remaining - 1
+    )
   end
 end

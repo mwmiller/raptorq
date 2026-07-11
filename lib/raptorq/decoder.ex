@@ -16,7 +16,7 @@ defmodule Raptorq.Decoder do
   rows plus the S+H LDPC+HDPC rows give the full L×L system).
   """
 
-  alias Raptorq.{ConstraintMatrix, Solver, Encoder, SIOP}
+  alias Raptorq.{ConstraintMatrix, Encoder, SIOP, Solver}
 
   @doc """
   Decode received symbols to recover original source data.
@@ -55,12 +55,15 @@ defmodule Raptorq.Decoder do
             {[pair | acc], MapSet.put(seen, isi)}
           end
       end)
+
     {:ok, Enum.reverse(deduped)}
   end
 
   defp validate_sizes([]), do: :ok
+
   defp validate_sizes([{_, first} | rest]) do
     sz = byte_size(first)
+
     if Enum.all?(rest, fn {_, s} -> byte_size(s) == sz end) do
       :ok
     else

@@ -1,11 +1,9 @@
 defmodule Raptorq.Octet do
-  @moduledoc """
-  Functions to operate on octets and symbols
-  """
+  @moduledoc false
   import Bitwise
 
   @doc """
-  Add two octects
+  Add two octets
 
   iex> Raptorq.Octet.oadd(<<254>>, <<2>>)
   <<252>>
@@ -17,7 +15,7 @@ defmodule Raptorq.Octet do
   def oadd(u, v), do: raise(ArgumentError, "Invalid octet: #{u} or #{v}")
 
   @doc """
-  Subtract two octects
+  Subtract two octets
   Eqivalent to oaddition
 
   iex> Raptorq.Octet.osub(<<1>>, <<1>>)
@@ -64,11 +62,11 @@ defmodule Raptorq.Octet do
     def olog(<<unquote(i + 1)>>), do: unquote(v)
   end)
 
-  def olog(bi), do: raise(ArgumentError, "Invalid octect: #{bi}")
+  def olog(bi), do: raise(ArgumentError, "Invalid octet: #{bi}")
 
   @doc """
   Octet exp table lookup.
-  Returns the octect in the OCT_EXP table at the given index.
+  Returns the octet in the OCT_EXP table at the given index.
   Valid indices are in the range 0..509
 
   iex> Raptorq.Octet.oexp(42)

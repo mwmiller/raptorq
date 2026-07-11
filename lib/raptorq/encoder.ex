@@ -56,7 +56,17 @@ defmodule Raptorq.Encoder do
   defp pi_chain_sum(syms, prev, a1, p, p1, w, remaining, acc) do
     raw = rem(prev + a1, p1)
     idx = w + move_down(raw, a1, p, p1)
-    pi_chain_sum(syms, raw, a1, p, p1, w, remaining - 1, Octet.sadd(acc, Enum.at(syms, idx, <<0>>)))
+
+    pi_chain_sum(
+      syms,
+      move_down(raw, a1, p, p1),
+      a1,
+      p,
+      p1,
+      w,
+      remaining - 1,
+      Octet.sadd(acc, Enum.at(syms, idx, <<0>>))
+    )
   end
 
   # ── PI boundary crossing ──────────────────────────────────────────────

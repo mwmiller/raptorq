@@ -1,28 +1,7 @@
 defmodule Raptorq.ConstraintMatrix do
-  @moduledoc """
-  Builds the constraint matrix A from RFC 6330 Section 5.3.3.4.2.
+  @moduledoc false
 
-  The matrix A is L×L over GF(2^8) satisfying A·C = D, where:
-    - C: column vector of L intermediate symbols
-    - D: S+H zero symbols followed by K' source symbols
-
-  Matrix structure (Figure 5):
-  ```
-              B     S     U     H
-           +-----+-----+-----+-----+
-    S      |LDPC1| I_S |LDPC2|  0  |
-           +-----+-----+-----+-----+
-    H      |        G_HDPC     | I_H|
-           +-----+-----+-----+-----+
-    K'     |        G_ENC           |
-           +-----+-----+-----+-----+
-  ```
-
-  Each row is a map `%{col_index => <<octet::8>>}`. LDPC and G_ENC rows
-  contain only `<<1>>` entries; HDPC rows contain full GF(2^8) values.
-  """
-
-  alias Raptorq.{SIOP, Generators, Octet}
+  alias Raptorq.{Generators, Octet, SIOP}
 
   @doc """
   Build the full constraint matrix A as a list of L row maps.
@@ -61,6 +40,7 @@ defmodule Raptorq.ConstraintMatrix do
         acc ->
           a = 1 + div(i, s)
           b0 = rem(i, s)
+
           acc
           |> add_to_row(b0, i)
           |> add_to_row(rem(b0 + a, s), i)
@@ -69,10 +49,14 @@ defmodule Raptorq.ConstraintMatrix do
 
     for i <- 0..(s - 1) do
       row = %{}
-      row = Map.put(row, b + i, <<1>>)                          # I_S
-      row = Map.put(row, w + rem(i, p), <<1>>)                   # G_LDPC,2
-      row = Map.put(row, w + rem(i + 1, p), <<1>>)               # G_LDPC,2
-      row = merge_maps(row, Map.get(ldpc1, i, %{}))             # G_LDPC,1
+      # I_S
+      row = Map.put(row, b + i, <<1>>)
+      # G_LDPC,2
+      row = Map.put(row, w + rem(i, p), <<1>>)
+      # G_LDPC,2
+      row = Map.put(row, w + rem(i + 1, p), <<1>>)
+      # G_LDPC,1
+      row = merge_maps(row, Map.get(ldpc1, i, %{}))
       row
     end
   end
@@ -99,7 +83,7 @@ defmodule Raptorq.ConstraintMatrix do
     alpha = <<2>>
 
     # Initialize rows with the rightmost column: G_HDPC[i, K'+S-1] = α^i
-    rows = for i <- 0..(h - 1), do: %{kps - 1 => Octet.oexp(i)}
+    rows = for i <- 0..(h - 1), do: %{(kps - 1) => Octet.oexp(i)}
 
     # Work leftwards: G_HDPC[i,j] = α · G_HDPC[i,j+1] + MT[i,j]
     rows =
@@ -127,7 +111,9 @@ defmodule Raptorq.ConstraintMatrix do
       end)
 
     # Append I_H: column K'+S+i has value 1 for each row i
-    rows |> Enum.with_index() |> Enum.map(fn {row, i} ->
+    rows
+    |> Enum.with_index()
+    |> Enum.map(fn {row, i} ->
       Map.put(row, kps + i, <<1>>)
     end)
   end
@@ -167,6 +153,7 @@ defmodule Raptorq.ConstraintMatrix do
   end
 
   defp lt_chain_indices(_b, _a, _w, 0, acc), do: :lists.reverse(acc)
+
   defp lt_chain_indices(b, a, w, remaining, acc) do
     idx = rem(b + a, w)
     lt_chain_indices(idx, a, w, remaining - 1, [idx | acc])
@@ -177,6 +164,7 @@ defmodule Raptorq.ConstraintMatrix do
   end
 
   defp pi_chain_indices(_prev, _a1, _p, _p1, _w, 0, acc), do: :lists.reverse(acc)
+
   defp pi_chain_indices(prev, a1, p, p1, w, remaining, acc) do
     raw = rem(prev + a1, p1) |> move_down(a1, p, p1)
     pi_chain_indices(raw, a1, p, p1, w, remaining - 1, [w + raw | acc])

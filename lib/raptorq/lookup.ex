@@ -1,9 +1,5 @@
 defmodule Raptorq.Lookup do
-  @moduledoc """
-    This module provides lookup functions for the RaptorQ encoder and decoder.
-    The functions should be largely stable, but the internal implementation
-    may change under the hood.
-  """
+  @moduledoc false
   # I could do some extra magic here to make them match
   # but I don't think it's worth it, and it would reduce flexibility
   for {file, which} <- [

@@ -1,7 +1,5 @@
 defmodule Raptorq.Precoding do
-  @moduledoc """
-  This module provides functions to establish precoding relationships
-  """
+  @moduledoc false
 
   alias Raptorq.{SIOP, Octet}
 

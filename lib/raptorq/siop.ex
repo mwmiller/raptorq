@@ -1,7 +1,5 @@
 defmodule Raptorq.SIOP do
-  @moduledoc """
-  Standard Indices and Other Parameters (SIOP) for RaptorQ.
-  """
+  @moduledoc false
 
   # This used to be a module attribute, but Elixir 1.19 deprecates this
   # due to changes in OTP-28 in how regexes are compiled.

@@ -1,6 +1,6 @@
 defmodule RaptorqEncoderTest do
   use ExUnit.Case
-  alias Raptorq.{Encoder, ConstraintMatrix, Octet}
+  alias Raptorq.{ConstraintMatrix, Encoder, Octet}
 
   @symbol_size 4
 
@@ -30,6 +30,7 @@ defmodule RaptorqEncoderTest do
     # Verify each encoding symbol matches the corresponding source symbol
     for isi <- 0..(k - 1) do
       enc_sym = Encoder.encode_symbol(c_syms, params, isi)
+
       assert enc_sym == Enum.at(source_syms, isi),
              "Mismatch at ISI #{isi}: got #{inspect(enc_sym)}, expected #{inspect(Enum.at(source_syms, isi))}"
     end
@@ -60,7 +61,7 @@ defmodule RaptorqEncoderTest do
     assert length(src) == k
     assert sz == 10
 
-    repair = Raptorq.repair(c, params, sz, 999)
+    repair = Raptorq.repair(c, params, 999)
     assert byte_size(repair) == 10
   end
 
@@ -71,6 +72,7 @@ defmodule RaptorqEncoderTest do
       c_syms = for _ <- 1..l, do: :crypto.strong_rand_bytes(@symbol_size)
 
       enc = Encoder.encode_symbol(c_syms, params, 0)
+
       assert byte_size(enc) == @symbol_size,
              "K'=#{kp}: encoding symbol size mismatch"
     end
