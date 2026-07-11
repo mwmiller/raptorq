@@ -66,22 +66,28 @@ defmodule RaptorqSolverTest do
     pivot = Enum.at(a, col)
 
     {a, ops} =
-      Enum.reduce(Enum.reject(0..(n - 1), &(&1 == col)), {a, ops}, fn row, {a_acc, ops_acc} ->
-        f = a_acc |> Enum.at(row) |> Enum.at(col)
-
-        if f != <<0>> do
-          new_row =
-            Enum.zip_with(Enum.at(a_acc, row), pivot, fn v, pv ->
-              Octet.oadd(v, Octet.omul(pv, f))
-            end)
-
-          {List.replace_at(a_acc, row, new_row), [{:fma, col, row, f} | ops_acc]}
-        else
-          {a_acc, ops_acc}
-        end
-      end)
+      Enum.reduce(
+        Enum.reject(0..(n - 1), &(&1 == col)),
+        {a, ops},
+        &ge_eliminate_row(&1, &2, col, pivot)
+      )
 
     do_ge(a, n, col + 1, ops)
+  end
+
+  defp ge_eliminate_row(row, {a_acc, ops_acc}, col, pivot) do
+    case a_acc |> Enum.at(row) |> Enum.at(col) do
+      <<0>> ->
+        {a_acc, ops_acc}
+
+      f ->
+        new_row =
+          Enum.zip_with(Enum.at(a_acc, row), pivot, fn v, pv ->
+            Octet.oadd(v, Octet.omul(pv, f))
+          end)
+
+        {List.replace_at(a_acc, row, new_row), [{:fma, col, row, f} | ops_acc]}
+    end
   end
 
   defp scale_row(a, row, inv) do

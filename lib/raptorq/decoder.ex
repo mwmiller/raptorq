@@ -97,21 +97,22 @@ defmodule Raptorq.Decoder do
       case Solver.solve(all_rows, params, d_syms) do
         {:ok, c_syms} ->
           source = reconstruct_source(c_syms, params, k)
-          data = IO.iodata_to_binary(source)
-
-          result =
-            if data_size do
-              binary_part(data, 0, min(data_size, byte_size(data)))
-            else
-              data
-            end
-
-          {:halt, {:ok, result}}
+          {:halt, {:ok, truncate(source, data_size)}}
 
         {:error, reason} ->
           {:cont, {:error, reason}}
       end
     end)
+  end
+
+  defp truncate(source, data_size) do
+    data = IO.iodata_to_binary(source)
+
+    if data_size do
+      binary_part(data, 0, min(data_size, byte_size(data)))
+    else
+      data
+    end
   end
 
   defp reconstruct_source(c_syms, params, k) do

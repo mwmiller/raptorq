@@ -18,21 +18,21 @@ defmodule RaptorqSIOPTest do
     k_56044 = %{
       h: 16,
       j: 471,
-      k: 56403,
+      k: 56_403,
       s: 907,
-      w: 56951,
-      b: 56044,
-      l: 57326,
+      w: 56_951,
+      b: 56_044,
+      l: 57_326,
       p: 375,
       p1: 379,
       u: 359
     }
 
-    assert values_for(56402, :close) == k_56044
-    assert values_for(56403) == k_56044
+    assert values_for(56_402, :close) == k_56044
+    assert values_for(56_403) == k_56044
 
-    assert_raise ArgumentError, fn -> values_for(56404) end
-    assert_raise ArgumentError, fn -> values_for(56404, :close) end
+    assert_raise ArgumentError, fn -> values_for(56_404) end
+    assert_raise ArgumentError, fn -> values_for(56_404, :close) end
     assert_raise ArgumentError, fn -> values_for(9, :exact) end
   end
 end

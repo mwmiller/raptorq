@@ -116,28 +116,30 @@ defmodule Raptorq.Solver do
   # Forward-eliminate `pivot_col` from every row below it, applying the
   # same scaled update to the sparse matrix `a` and the symbol vector `d`.
   defp eliminate_below(a, d, pivot_col, pivot_val, m) do
-    if pivot_val == <<0>> do
-      {a, d}
-    else
-      (pivot_col + 1)..(m - 1)
-      |> Enum.reduce({a, d}, &eliminate_pivot_row(&1, pivot_col, pivot_val, &2))
+    case pivot_val do
+      <<0>> ->
+        {a, d}
+
+      _ ->
+        (pivot_col + 1)..(m - 1)
+        |> Enum.reduce({a, d}, &eliminate_pivot_row(&2, pivot_col, pivot_val, &1))
     end
   end
 
   defp eliminate_pivot_row({a_acc, d_acc}, pivot_col, pivot_val, row) do
-    beta = a_acc |> Enum.at(row, %{}) |> Map.get(pivot_col, <<0>>)
+    case a_acc |> Enum.at(row, %{}) |> Map.get(pivot_col, <<0>>) do
+      <<0>> ->
+        {a_acc, d_acc}
 
-    if beta == <<0>> do
-      {a_acc, d_acc}
-    else
-      scalar = Octet.odiv(beta, pivot_val)
-      a_acc = fma(a_acc, pivot_col, row, scalar)
+      beta ->
+        scalar = Octet.odiv(beta, pivot_val)
+        a_acc = fma(a_acc, pivot_col, row, scalar)
 
-      d_acc =
-        Octet.sadd(Enum.at(d_acc, row), Octet.smul(Enum.at(d_acc, pivot_col), scalar))
-        |> then(fn v -> List.replace_at(d_acc, row, v) end)
+        d_acc =
+          Octet.sadd(Enum.at(d_acc, row), Octet.smul(Enum.at(d_acc, pivot_col), scalar))
+          |> then(fn v -> List.replace_at(d_acc, row, v) end)
 
-      {a_acc, d_acc}
+        {a_acc, d_acc}
     end
   end
 
@@ -447,20 +449,21 @@ defmodule Raptorq.Solver do
     else
       Enum.reduce(0..(i - 1), {a, d}, fn i_col, {a_acc, d_acc} ->
         pivot_val = a_acc |> Enum.at(i_col, %{}) |> Map.get(i_col, <<1>>)
-
-        Enum.reduce(i..(m - 1), {a_acc, d_acc}, fn u_row, {a2, d2} ->
-          val = a2 |> Enum.at(u_row, %{}) |> Map.get(i_col, <<0>>)
-
-          if val != <<0>> do
-            sc = Octet.odiv(val, pivot_val)
-
-            {fma(a2, i_col, u_row, sc),
-             d2 |> List.update_at(u_row, &Octet.sadd(&1, Octet.smul(Enum.at(d2, i_col), sc)))}
-          else
-            {a2, d2}
-          end
-        end)
+        Enum.reduce(i..(m - 1), {a_acc, d_acc}, &eliminate_i_row(&2, &1, i_col, pivot_val))
       end)
+    end
+  end
+
+  defp eliminate_i_row({a2, d2}, u_row, i_col, pivot_val) do
+    case a2 |> Enum.at(u_row, %{}) |> Map.get(i_col, <<0>>) do
+      <<0>> ->
+        {a2, d2}
+
+      val ->
+        sc = Octet.odiv(val, pivot_val)
+
+        {fma(a2, i_col, u_row, sc),
+         d2 |> List.update_at(u_row, &Octet.sadd(&1, Octet.smul(Enum.at(d2, i_col), sc)))}
     end
   end
 
@@ -478,6 +481,7 @@ defmodule Raptorq.Solver do
       if pivot_actual != col do
         src_pos = Enum.at(u_lower_pos, col)
         src_pivot_pos = Enum.at(u_lower_pos, pivot_actual)
+
         {swap_list(r_a, col, pivot_actual), swap_list(a_a, src_pos, src_pivot_pos),
          swap_list(d_a, src_pos, src_pivot_pos), swap_list(dp_a, src_pos, src_pivot_pos)}
       else
@@ -501,25 +505,30 @@ defmodule Raptorq.Solver do
 
     {r_a, a_a, d_a} =
       Enum.reject(0..(u - 1), &(&1 == col))
-      |> Enum.reduce({r_a, a_a, d_a}, fn r, {r2_a, a2_a, d2_a} ->
-        val = r2_a |> Enum.at(r) |> Enum.at(col)
-
-        if val != <<0>> do
-          new_r =
-            Enum.zip_with(Enum.at(r2_a, r), pivot_row, fn v, pv ->
-              Octet.oadd(v, Octet.omul(pv, val))
-            end)
-
-          {List.replace_at(r2_a, r, new_r),
-           fma(a2_a, Enum.at(u_lower_pos, col), Enum.at(u_lower_pos, r), val),
-           d2_a
-           |> List.update_at(Enum.at(u_lower_pos, r), &Octet.sadd(&1, Octet.smul(Enum.at(d2_a, Enum.at(u_lower_pos, col)), val)))}
-        else
-          {r2_a, a2_a, d2_a}
-        end
-      end)
+      |> Enum.reduce({r_a, a_a, d_a}, &ge_eliminate_col(&2, &1, col, u_lower_pos, pivot_row))
 
     {r_a, a_a, d_a, dp_a}
+  end
+
+  defp ge_eliminate_col({r2_a, a2_a, d2_a}, r, col, u_lower_pos, pivot_row) do
+    val = r2_a |> Enum.at(r) |> Enum.at(col)
+
+    if val != <<0>> do
+      new_r =
+        Enum.zip_with(Enum.at(r2_a, r), pivot_row, fn v, pv ->
+          Octet.oadd(v, Octet.omul(pv, val))
+        end)
+
+      {List.replace_at(r2_a, r, new_r),
+       fma(a2_a, Enum.at(u_lower_pos, col), Enum.at(u_lower_pos, r), val),
+       d2_a
+       |> List.update_at(
+         Enum.at(u_lower_pos, r),
+         &Octet.sadd(&1, Octet.smul(Enum.at(d2_a, Enum.at(u_lower_pos, col)), val))
+       )}
+    else
+      {r2_a, a2_a, d2_a}
+    end
   end
 
   # Write the identity block back into the U columns of each U-lower row.
@@ -527,17 +536,18 @@ defmodule Raptorq.Solver do
     a2 =
       Enum.reduce(0..(u - 1), final_a, fn offset, a_acc ->
         act_row = Enum.at(u_lower_pos, offset)
-
-        new_row =
-          Enum.reduce(0..(u - 1), final_a |> Enum.at(act_row, %{}), fn col_off, r ->
-            c = u_start + col_off
-            if offset == col_off, do: Map.put(r, c, <<1>>), else: Map.delete(r, c)
-          end)
-
+        new_row = identity_row(final_a |> Enum.at(act_row, %{}), u_start, u, offset)
         List.replace_at(a_acc, act_row, new_row)
       end)
 
     {a2, final_d, final_d_perm}
+  end
+
+  defp identity_row(row_map, u_start, u, offset) do
+    Enum.reduce(0..(u - 1), row_map, fn col_off, r ->
+      c = u_start + col_off
+      if offset == col_off, do: Map.put(r, c, <<1>>), else: Map.delete(r, c)
+    end)
   end
 
   defp scale_sparse(a, row, scalar) do

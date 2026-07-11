@@ -14,27 +14,27 @@ defmodule Raptorq.ReferenceVectorsTest do
   Elixir library's single-source-block model exactly. For each case the harness
   emitted:
 
-    * the `K` source symbols (encoding symbol IDs 0..K-1), and
-    * the first 8 repair symbols, whose RFC 6330 encoding-symbol IDs are
-      K'..K'+7 (i.e. `repair_packets(0, 8)`).
+   * the `K` source symbols (encoding symbol IDs 0..K-1), and
+   * the first 8 repair symbols, whose RFC 6330 encoding-symbol IDs are
+     K'..K'+7 (i.e. `repair_packets(0, 8)`).
 
   Only the hardcoded outputs are committed below; no Rust or Python tooling is
   required to run this test.
 
-   ## Status: CONFORMANT
+  ## Status: CONFORMANT
 
-   All three cases below pass: the source-symbol split, the 8 repair
-   symbols (RFC IDs K'..K'+7), and full data recovery via
-   `Raptorq.decode/3` all match the cberner 2.0.1 reference output.
+  All three cases below pass: the source-symbol split, the 8 repair
+  symbols (RFC IDs K'..K'+7), and full data recovery via
+  `Raptorq.decode/3` all match the cberner 2.0.1 reference output.
 
-   Run with:
+  Run with:
 
-       mix test --only conformance
+      mix test --only conformance
 
-   Recovery requires K' symbols (the extended source-block size), not K.
-   The zero-padding source symbols (ISIs K..K'-1) are regenerated from C
-   and supplied so step 2 holds even for extended blocks (e.g. K=16, K'=18).
-   """
+  Recovery requires K' symbols (the extended source-block size), not K.
+  The zero-padding source symbols (ISIs K..K'-1) are regenerated from C
+  and supplied so step 2 holds even for extended blocks (e.g. K=16, K'=18).
+  """
 
   use ExUnit.Case, async: true
 

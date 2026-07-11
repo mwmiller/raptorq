@@ -23,7 +23,7 @@ defmodule RaptorqConstraintMatrixTest do
 
   @tag timeout: 120_000
   test "row count for maximum K'" do
-    {rows, params} = ConstraintMatrix.build(56403)
+    {rows, params} = ConstraintMatrix.build(56_403)
     %{k: k, s: s, h: h, l: l} = params
     assert length(rows) == l
     assert l == k + s + h

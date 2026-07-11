@@ -1,7 +1,7 @@
 defmodule Raptorq.Precoding do
   @moduledoc false
 
-  alias Raptorq.{SIOP, Octet}
+  alias Raptorq.{Octet, SIOP}
 
   @doc """
   Establish LDPC precoding relationships.
