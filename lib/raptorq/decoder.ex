@@ -29,40 +29,71 @@ defmodule Raptorq.Decoder do
   Returns `{:ok, binary}` with the decoded data, or `{:error, reason}`.
   """
   def decode(received, k, data_size \\ nil) do
-    %{k: kp, s: s, h: h, l: l} = params = SIOP.values_for(k, :close)
+    %{l: l} = params = SIOP.values_for(k, :close)
+    needed = l - params.s - params.h
 
-    received_cnt = length(received)
-    needed = l - s - h
+    with :ok <- validate_count(received, needed),
+         {:ok, deduped} <- deduplicate(received),
+         :ok <- validate_sizes(deduped) do
+      try_subsets(deduped, needed, params, k, data_size)
+    end
+  end
 
-    if received_cnt < needed do
-      {:error, "Need at least #{needed} encoding symbols, got #{received_cnt}"}
+  # ── Validation ────────────────────────────────────────────────────────
+
+  defp validate_count(received, needed) do
+    if length(received) >= needed, do: :ok, else: {:error, :insufficient_symbols}
+  end
+
+  defp deduplicate(received) do
+    {deduped, _} =
+      Enum.reduce(received, {[], MapSet.new()}, fn
+        {isi, _sym} = pair, {acc, seen} ->
+          if MapSet.member?(seen, isi) do
+            {acc, seen}
+          else
+            {[pair | acc], MapSet.put(seen, isi)}
+          end
+      end)
+    {:ok, Enum.reverse(deduped)}
+  end
+
+  defp validate_sizes([]), do: :ok
+  defp validate_sizes([{_, first} | rest]) do
+    sz = byte_size(first)
+    if Enum.all?(rest, fn {_, s} -> byte_size(s) == sz end) do
+      :ok
     else
-      # Take the first needed ISIs
-      selected = Enum.take(received, needed)
+      {:error, :inconsistent_symbol_size}
+    end
+  end
 
-      # Build LDPC + HDPC rows
+  # ── Subset selection ──────────────────────────────────────────────────
+
+  defp try_subsets(received, needed, params, k, data_size) do
+    # Try two orderings: normal and reversed.
+    orderings = [received, Enum.reverse(received)]
+
+    Enum.reduce_while(orderings, {:error, :singular}, fn order, _ ->
+      selected = Enum.take(order, needed)
+      %{k: kp, s: s, h: h} = params
+
       {fixed_rows, _} = ConstraintMatrix.build(kp)
       ldpc_hdpc = Enum.take(fixed_rows, s + h)
 
-      # Build G_ENC rows for received ISIs
-      isis = Enum.map(selected, fn {isi, _} -> isi end)
+      {isis, syms} = Enum.unzip(selected)
       enc_rows = ConstraintMatrix.build_enc_rows(params.k, params.w, params.p, params.p1, isis)
 
-      # Full constraint matrix = LDPC + HDPC + ENC rows
       all_rows = ldpc_hdpc ++ enc_rows
 
-      # Build D vector: S+H zeros + received symbol values
       [{_, first_sym} | _] = selected
       sym_size = byte_size(first_sym)
       zero = :binary.copy(<<0>>, sym_size)
-      d_syms = List.duplicate(zero, s + h) ++ Enum.map(selected, fn {_, sym} -> sym end)
+      d_syms = List.duplicate(zero, s + h) ++ syms
 
-      # Solve A*C = D
       case Solver.solve(all_rows, params, d_syms) do
         {:ok, c_syms} ->
-          # Reconstruct first K source symbols
-          source = reconstruct_source(c_syms, params, k, sym_size)
-
+          source = reconstruct_source(c_syms, params, k)
           data = IO.iodata_to_binary(source)
 
           result =
@@ -72,15 +103,15 @@ defmodule Raptorq.Decoder do
               data
             end
 
-          {:ok, result}
+          {:halt, {:ok, result}}
 
         {:error, reason} ->
-          {:error, reason}
+          {:cont, {:error, reason}}
       end
-    end
+    end)
   end
 
-  defp reconstruct_source(c_syms, params, k, _sym_size) do
+  defp reconstruct_source(c_syms, params, k) do
     for isi <- 0..(k - 1), do: Encoder.encode_symbol(c_syms, params, isi)
   end
 end

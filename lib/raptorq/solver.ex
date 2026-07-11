@@ -110,19 +110,23 @@ defmodule Raptorq.Solver do
       p_sym = Enum.at(d, col)
 
       {a, d} =
-        Enum.reduce(Enum.reject(0..(n - 1), &(&1 == col)), {a, d}, fn row, {a_acc, d_acc} ->
-          f = a_acc |> Enum.at(row) |> Enum.at(col)
+        a
+        |> Enum.with_index()
+        |> Enum.reduce({a, d}, fn
+          {_row, ^col}, acc -> acc
+          {row, r}, {a_acc, d_acc} ->
+            f = Enum.at(row, col)
 
-          if f != <<0>> do
-            new_row = Enum.zip_with(Enum.at(a_acc, row), pivot_row, fn v, pv ->
-              Octet.oadd(v, Octet.omul(pv, f))
-            end)
+            if f != <<0>> do
+              new_row = Enum.zip_with(row, pivot_row, fn v, pv ->
+                Octet.oadd(v, Octet.omul(pv, f))
+              end)
 
-            new_d = Octet.sadd(Enum.at(d_acc, row), Octet.smul(p_sym, f))
-            {List.replace_at(a_acc, row, new_row), List.replace_at(d_acc, row, new_d)}
-          else
-            {a_acc, d_acc}
-          end
+              new_d = Octet.sadd(Enum.at(d_acc, r), Octet.smul(p_sym, f))
+              {List.replace_at(a_acc, r, new_row), List.replace_at(d_acc, r, new_d)}
+            else
+              {a_acc, d_acc}
+            end
         end)
 
       ge_full(a, d, n, col + 1)
