@@ -102,9 +102,6 @@ symbols per block. No return channel needed.
 | K=500  L=558 | ~3.7 s |
 | K=1000 L=1071 | ~23 s |
 
-Uses the 5-phase sparse solver (`Raptorq.Solver`) for efficient O(L²) decoding
-of intermediate symbols. The previous `Solver5` (dense) implementation was removed.
-
 ## Tests
 
 ```bash
