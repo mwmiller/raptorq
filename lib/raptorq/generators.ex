@@ -50,10 +50,9 @@ defmodule Raptorq.Generators do
 
   def deg(v, k_prime)
       when is_integer(v) and v >= 0 and v <= 1_048_576 and is_integer(k_prime) do
-    {_, dtable} = Enum.find(@degrees, {0, 0}, fn {f, _} -> v >= f end)
-    # This will raise on improper k_prime so we can just match
+    {_, dtable} = Enum.find(@degrees, fn {f, _} -> v >= f end)
     %{w: w} = SIOP.values_for(k_prime, :exact)
-    min(dtable, w - 2)
+    min(dtable + 1, w - 2)
   end
 
   def deg(v, k_prime) do
