@@ -2,18 +2,40 @@ defmodule Raptorq do
   @moduledoc """
   RaptorQ forward error correction (RFC 6330).
 
-  ## Encoding
+  ## Quick start
 
+      # Encode: split data into K symbols and compute intermediate symbols C
       data = File.read!("myfile.dat")
-      {:ok, %{c: c_syms, params: params, symbol_size: sym_size}} = Raptorq.encode(data, 10)
+      {:ok, state} = Raptorq.encode(data, 10)
 
-      # Generate repair symbols for any ISI
-      repair = Raptorq.repair(c_syms, params, sym_size, 100_000)
+      # Generate repair symbols for any ISI ≥ K'
+      c = Map.get(state, :c)
+      p = Map.get(state, :params)
+      sz = Map.get(state, :symbol_size)
+      repair_1 = Raptorq.repair(c, p, sz, 100_000)
+      repair_2 = Raptorq.repair(c, p, sz, 100_001)
 
-  ## Decoding (coming soon)
+      # Decode: recover from any K' of the (source + repair) symbols
+      received = [{0, sym_0}, {3, sym_3}, {100_000, repair_1} | ...]
+      {:ok, data} = Raptorq.decode(received, 10, byte_size(data))
 
-      received = [{0, sym_0}, {1, sym_1}, ..., {100_000, repair_100_000}]
-      {:ok, data} = Raptorq.decode(received, 10, sym_size, data_size)
+  ## Architecture
+
+  The source data is split into K equal-sized symbols.  Using the
+  SIOP table, K' ≥ K is chosen, and the K'-K tail symbols are zero-
+  padded.  The constraint matrix A (L = S+H+K' rows/columns) is built
+  linking intermediate symbols C to the source symbols via A·C = D.
+
+  Encoding symbols for any ISI (0 … 2²⁰−1) are linear combinations of
+  C produced by Tuple[K', ISI] (RFC 6330 §5.3.5.4).  The receiver
+  builds a system from LDPC+HDPC rows (always D=0) and G_ENC rows for
+  received ISIs, then solves for C to recover the source data.
+
+  ## Performance
+
+  The current solver uses dense Gauss-Jordan (O(L³) + list-access
+  overhead).  Suitable for K ≤ 500.  See `Raptorq.Solver` for details
+  and the planned 5-phase sparse solver.
   """
 
   alias Raptorq.{ConstraintMatrix, Solver, Encoder, Decoder, SIOP}

@@ -1,9 +1,24 @@
 defmodule Raptorq.Solver do
   @moduledoc """
-  Solve A·C = D for the L intermediate symbols C using
-  dense Gauss-Jordan elimination over GF(2⁸).
+  Solve A·C = D for the L intermediate symbols C over GF(2⁸).
 
-  This is O(L³) — sufficient for small-to-medium K' values.
+  ## Current implementation: dense Gauss-Jordan
+
+  Converts the sparse constraint matrix to a dense L×L octet matrix
+  and runs full elimination.  The `Enum.at`/`List.replace_at` calls
+  on list-of-lists add O(L) overhead per access, making the effective
+  complexity O(L⁴) for list traversal + O(L³) for arithmetic.
+
+  Benchmarks:
+    K=10   L=27     1ms
+    K=200  L=233  322ms
+    K=500  L=558  3.7s
+    K=1000 L=1071 23s
+
+  For K > ~500 a 5-phase sparse solver (RFC 6330 §5.4.2.2) tracking
+  row/column ops on sparse maps is needed instead.  The old 5-phase
+  prototype hit a column-swap contamination bug in Phase 1; see git
+  history for details.
   """
 
   alias Raptorq.Octet
@@ -11,12 +26,18 @@ defmodule Raptorq.Solver do
   defstruct [:A, :D, :L, :params]
 
   @doc """
-  Solve A·C = D.
+  Solve A·C = D for the intermediate symbols C.
 
-  `constraint_rows` is a list of row maps for the first L rows
-  of the constraint matrix.  `params` is the SIOP parameter map.
+  `constraint_rows` — first L rows of the constraint matrix (list of
+  `%{col => <<val>>}` maps).
 
-  Returns `{:ok, intermediate_symbols}` or `{:error, :singular}`.
+  `params` — SIOP parameter map (from `Raptorq.SIOP.values_for/2`).
+
+  `d_symbols` — column vector D of L symbols (each a binary of equal
+  length).
+
+  Returns `{:ok, c_syms}` where `c_syms` is a list of L intermediate
+  symbols, or `{:error, :singular}` if the matrix is rank-deficient.
   """
   def solve(constraint_rows, params, d_symbols, opts \\ []) do
     %{l: l} = params

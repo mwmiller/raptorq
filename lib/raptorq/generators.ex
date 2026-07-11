@@ -4,9 +4,10 @@ defmodule Raptorq.Generators do
   various required parameters.
   """
 
-  import Bitwise
-  import Raptorq.Lookup
-  alias Raptorq.SIOP
+import Bitwise
+import Raptorq.Lookup
+alias Raptorq.SIOP
+alias Raptorq.Octet
 
   # Regex cannot be module attributes as of Elixir 1.19
   # This is kept as a "once used variable" for clarity.
@@ -134,25 +135,28 @@ defmodule Raptorq.Generators do
 
   @doc """
     Generates the encoded symbol for a given k_prime and intermediate symbols.
+    `symbols` should be a list of L intermediate symbol binaries.
+    The tuple `{d, a, b, d1, a1, b1}` comes from `tuple/2`.
+
+    Delegates to `Raptorq.Encoder.encode_symbol/3`.
   """
   def enc(k_prime, symbols, {d, a, b, d1, a1, b1}) do
-    %{l: l, w: w, p: p, p1: p1} = SIOP.values_for(k_prime, :exact)
+    %{w: w, p: p, p1: p1} = params = SIOP.values_for(k_prime, :exact)
 
-    if tuple_size(symbols) != l do
+    if length(symbols) != params.l do
       raise ArgumentError,
-            "Invalid arguments for enc function. Tuple size must be equal to l (#{l})."
+            "Invalid arguments for enc function. List length must be equal to l (#{params.l})."
     end
 
     pb1 = move_down(b1, a1, p, p1)
 
     symbols
-    |> elem(b)
+    |> Enum.at(b)
     |> primary_result(b, a, w, symbols, d - 1)
-    |> then(fn res -> res + elem(symbols, w + pb1) end)
+    |> then(fn res -> Octet.sadd(res, Enum.at(symbols, w + pb1)) end)
     |> secondary_result(pb1, a1, p1, p, w, symbols, d1 - 1)
   end
 
-  # I tried to use a Y-combinator here but it didn't work out.
   defp move_down(b1, _a1, p, _p1) when b1 < p, do: b1
 
   defp move_down(b1, a1, p, p1) do
@@ -163,13 +167,13 @@ defmodule Raptorq.Generators do
 
   defp primary_result(res, prev_idx, a, w, symbols, remaining) do
     idx = rem(prev_idx + a, w)
-    primary_result(res + elem(symbols, idx), idx, a, w, symbols, remaining - 1)
+    primary_result(Octet.sadd(res, Enum.at(symbols, idx)), idx, a, w, symbols, remaining - 1)
   end
 
   defp secondary_result(res, _, _, _, _, _, _, 0), do: res
 
   defp secondary_result(res, prev_idx, a1, p1, p, w, symbols, remaining) do
     idx = rem(prev_idx + a1, p1) |> move_down(a1, p, p1)
-    secondary_result(res + elem(symbols, w + idx), idx, a1, p1, p, w, symbols, remaining - 1)
+    secondary_result(Octet.sadd(res, Enum.at(symbols, w + idx)), idx, a1, p1, p, w, symbols, remaining - 1)
   end
 end

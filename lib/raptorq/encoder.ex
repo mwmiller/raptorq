@@ -1,22 +1,28 @@
 defmodule Raptorq.Encoder do
   @moduledoc """
-  Compute RaptorQ encoding (repair) symbols from intermediate symbols.
+  Compute RaptorQ encoding (repair) symbols from intermediate symbols C.
 
   Per RFC 6330 §5.3.5.3, an encoding symbol for ISI X is the XOR of
-  intermediate symbols at column indices given by Tuple[K', X].
+  the intermediate symbols at column indices produced by Tuple[K', X]:
+
+      Enc[K', X] = C[b] + C[b+a] + ... + C[w+pb1] + C[w+pb1+a1] + ...
+
+  where the LT chain walks the first `d` indices by step `a` modulo `w`,
+  and the PI chain walks `d1` indices by step `a1` modulo `p1` with
+  boundary-crossing via `move_down`.
   """
 
   alias Raptorq.{Generators, Octet}
 
   @doc """
-  Compute one encoding symbol for the given K' and ISI.
+  Compute one encoding symbol for the given intermediate symbols,
+  SIOP parameters, and ISI.
 
-  `c_syms` is the list of L intermediate symbols (each a binary of
-  `symbol_size` bytes).  Returns the encoding symbol.
+  Returns the encoding symbol as a binary (same byte size as a C symbol).
   """
-  def encode_symbol(c_syms, params, isi) do
+  def encode_symbol([first | _] = c_syms, params, isi) do
     %{k: k, w: w, p: p, p1: p1} = params
-    sym_size = byte_size(hd(c_syms))
+    sym_size = byte_size(first)
     zero = :binary.copy(<<0>>, sym_size)
     {d, a, b1, d1, a1, b2} = Generators.tuple(k, isi)
 
