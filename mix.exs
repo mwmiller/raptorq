@@ -29,8 +29,8 @@ defmodule Raptorq.MixProject do
   defp deps do
     [
       {:primacy, "~> 0.1.0"},
-      {:ex_doc, "~> 0.38", only: :docs, runtime: false},
-      {:makeup, "~> 1.1", only: :docs, runtime: false},
+      {:ex_doc, "~> 0.38", only: :dev, runtime: false},
+      {:makeup, "~> 1.1", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:usage_rules, "~> 1.2", only: [:dev, :test]}
     ]
