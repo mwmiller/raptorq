@@ -110,7 +110,8 @@ defmodule RaptorqDecoderTest do
     data = :crypto.strong_rand_bytes(37)
     k = 10
 
-    {:ok, encoded} = Raptorq.encode(data, k)
+    sym_size = ceil(byte_size(data) / k)
+    {:ok, encoded} = Raptorq.encode(data, k, sym_size)
     c = Map.get(encoded, :c)
     params = Map.get(encoded, :params)
 

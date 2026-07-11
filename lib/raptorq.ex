@@ -44,12 +44,44 @@ defmodule Raptorq do
   `data` is the source data as a binary.  `k` is the number of source
   symbols in the block.
 
+  The `data` length must be exactly `k * symbol_size` (i.e. divisible by `k`).
+  For automatic chunking with padding, use `encode/3`.
+
   Returns `{:ok, %{c: intermediate_symbols, params: siop_params,
   symbol_size: sym_size, k_prime: kp, source_symbols: source_syms}}`.
   """
   def encode(data, k) do
-    sym_size = ceil(byte_size(data) / k)
+    if rem(byte_size(data), k) != 0 do
+      raise ArgumentError,
+            "Data length must be an exact multiple of k. Use encode/3 for automatic chunking."
+    end
+
+    sym_size = div(byte_size(data), k)
     source_syms = split_symbols(data, k, sym_size)
+
+    kp = SIOP.values_for(k, :close).k
+    {:ok, c_syms, params} = compute_intermediate(source_syms, k, kp, sym_size)
+
+    {:ok,
+     %{c: c_syms, params: params, symbol_size: sym_size, k_prime: kp, source_symbols: source_syms}}
+  end
+
+  @doc """
+  Encode source data into exactly `k` source symbols of `sym_size`.
+
+  Pads the data with trailing zeros if necessary to reach `k * sym_size`.
+  """
+  def encode(data, k, sym_size) do
+    target_size = k * sym_size
+
+    padded_data =
+      if byte_size(data) > target_size do
+        binary_part(data, 0, target_size)
+      else
+        pad_to(data, target_size)
+      end
+
+    source_syms = split_symbols(padded_data, k, sym_size)
 
     kp = SIOP.values_for(k, :close).k
     {:ok, c_syms, params} = compute_intermediate(source_syms, k, kp, sym_size)

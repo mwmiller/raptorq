@@ -9,7 +9,7 @@ unlimited stream of encoded symbols.
 ```elixir
 def deps do
   [
-    {:raptorq, "~> 0.1.0"}
+    {:raptorq, "~> 0.2.0"}
   ]
 end
 ```
