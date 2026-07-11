@@ -95,15 +95,15 @@ symbols per block. No return channel needed.
 
 ## Performance
 
-| Block Size | Dense Solver (5-phase) |
-|------------|------------------------|
+| Block Size | 5-Phase Sparse Solver |
+|------------|-----------------------|
 | K=10   L=27 | ~1 ms |
 | K=200  L=233 | ~320 ms |
 | K=500  L=558 | ~3.7 s |
 | K=1000 L=1071 | ~23 s |
 
 Uses the 5-phase sparse solver (`Raptorq.Solver`) for efficient O(L²) decoding
-of intermediate symbols.
+of intermediate symbols. The previous `Solver5` (dense) implementation was removed.
 
 ## Tests
 
