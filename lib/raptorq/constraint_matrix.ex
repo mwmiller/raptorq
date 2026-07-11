@@ -34,7 +34,7 @@ defmodule Raptorq.ConstraintMatrix do
   Returns `{rows, params}`.
   """
   def build(k_prime, encoded_isis \\ nil) do
-    params = SIOP.values_for(k_prime, :exact)
+    params = SIOP.values_for(k_prime, :close)
     %{b: b, s: s, h: h, w: w, p: p, p1: p1, k: k} = params
 
     ldpc = build_ldpc_rows(b, s, w, p)
