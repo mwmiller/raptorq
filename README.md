@@ -9,7 +9,7 @@ unlimited stream of encoded symbols.
 ```elixir
 def deps do
   [
-    {:raptorq, "~> 0.2.0"}
+    {:raptorq, "~> 0.3.0"}
   ]
 end
 ```
@@ -19,6 +19,8 @@ end
 ```elixir
 # 1. Encode source data for a block of K source symbols.
 # We use `encode/3` to automatically pad the data to a valid symbol size.
+# Short data is padded up to k * sym_size; data longer than k * sym_size
+# raises ArgumentError (increase k or sym_size instead of relying on truncation).
 data = File.read!("myfile.dat")
 k = 10
 sym_size = ceil(byte_size(data) / k)
@@ -42,7 +44,7 @@ decoder = Raptorq.StreamingDecoder.new(k, byte_size(data))
 
 ## Streaming Decoder vs. Batch Decoding
 
-When receiving data over a network or radio link, symbols arrive asynchronously. The `Raptorq.StreamingDecoder` provides a stateful, ergonomic way to ingest symbols one by one and automatically attempts to solve the constraint matrix once enough symbols are available.
+When receiving data over a network or radio link, symbols arrive asynchronously. The `Raptorq.StreamingDecoder` provides a stateful, ergonomic way to ingest symbols one by one and automatically attempts to solve the constraint matrix once enough symbols are available. Once the data has been decoded, the result is cached and further symbols return it immediately.
 
 For offline or batch usage, you can pass a complete list of accumulated tuples directly to `Raptorq.decode/3`:
 
@@ -53,6 +55,15 @@ received = [{57, sym_57}, {3, sym_3}, {100_000, repair_1}, ...]
 # The original payload size must be known to strip trailing padding.
 {:ok, recovered_data} = Raptorq.decode(received, k, byte_size(payload))
 ```
+
+`decode/3` returns `{:error, :singular}` when the available symbols do not
+produce a verified solution. Every candidate solution is checked against the
+full constraint system (the LDPC/HDPC rows as well as the rows for the
+received symbols) before any data is returned, so a successful decode is
+always consistent with what was received and a failed one is reported rather
+than returning corrupt data. On `{:error, :singular}`, collect more symbols
+and call `decode/3` again; the streaming decoder does this automatically,
+retrying each time a new symbol arrives.
 
 ## Radio Beacon Usage
 
@@ -127,15 +138,15 @@ symbols per block. No return channel needed.
 
 ## Performance
 
-The following benchmarks measure the raw decoding/solver time (`Raptorq.decode/3`) using Elixir's `:timer.tc` on a single process. Since the 5-phase sparse solver runs in pure Elixir, time scales quadratically with $L$ (which is proportional to $K$). 
+The following benchmarks measure the raw decoding/solver time (`Raptorq.decode/3`) using Elixir's `:timer.tc` on a single process. Since the 5-phase sparse solver runs in pure Elixir, time scales quadratically with L (which is proportional to K).
 
 *Run on a single core; to reproduce, you can generate an array of received symbols (e.g. `needed = L - S - H`) and pass them to the decoder.*
 
 | Block Size | L | 5-Phase Sparse Solver |
 |------------|---|-----------------------|
-| K=10   | 27  | ~2.0 ms |
-| K=50   | 78  | ~36 ms |
-| K=100  | 128 | ~160 ms |
-| K=200  | 233 | ~1.0 s |
-| K=300  | 340 | ~3.5 s |
-| K=400  | 452 | ~8.7 s |
+| K=10   | 27  | ~1.2 ms |
+| K=50   | 78  | ~9.6 ms |
+| K=100  | 128 | ~23 ms |
+| K=200  | 233 | ~87 ms |
+| K=300  | 340 | ~0.21 s |
+| K=400  | 452 | ~0.42 s |

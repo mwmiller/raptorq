@@ -246,33 +246,40 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 
 ## Encode Preconditions
 
-- **Data length must be exact multiple of `symbol_size`** — `Raptorq.encode/2` does not pad. Caller must ensure `byte_size(data) % symbol_size == 0`. Use `Raptorq.encode/3` for automatic chunking.
-- **`symbol_size >= 2`** — `symbol_size = 1` panics (cberner Rust constraint).
+- **`encode/2`: data length must be an exact multiple of `k`** (and at least `k` bytes) — `Raptorq.encode/2` does not pad. Use `Raptorq.encode/3` for automatic padding to `k * symbol_size`.
+- **`encode/3` never truncates** — data larger than `k * symbol_size` raises `ArgumentError`; increase `k` or `symbol_size`.
+- **`symbol_size >= 1`** — `symbol_size = 1` works in this pure-Elixir implementation. The `symbol_size >= 2` limit is a cberner interop constraint only (see below).
+- **`k` must be a positive integer** and within the SIOP table (K' ≤ 56,403).
 - Returns `{:ok, state}` where `state.c` = **intermediate symbols** `C[0..K'-1]`, NOT source symbols.
 
 ## Repair ISI Semantics
 
-- `Raptorq.repair(c, params, isi)` takes **Intermediate Symbol Identifier (ISI)**.
-- Source symbols: ISI `0..K-1` where `K = params.k - params.s - params.h`.
-- Repair symbols: ISI `params.k..infinity` (i.e., `K' + offset`).
+- `Raptorq.repair(c, params, isi)` takes an **Intermediate Symbol Identifier (isi)** and returns the symbol binary directly (no `{:ok, ...}` wrapper).
+- `isi` must be a non-negative integer; anything else raises `ArgumentError`.
+- Source symbols: isi `0..K-1` where K is the `k` passed to `encode`.
+- Repair symbols: isi `params.k..infinity` (i.e., `K' + offset`).
 - cberner `repair_packets(start, n)` → ISIs `params.k + start .. params.k + start + n - 1`.
 
 ## Decode Preconditions
 
 - All received symbols must have identical `byte_size` — mixed sizes return `{:error, :inconsistent_symbol_size}`.
-- Returns `{:ok, binary}` on success, `{:error, reason}` on failure.
+- `received` must be a list of `{isi, symbol}` tuples (non-negative integer isi, non-empty binary symbol), `k` a positive integer, `data_size` (if given) a non-negative integer — otherwise `ArgumentError`.
+- Returns `{:ok, binary}` on success, `{:error, reason}` on failure (`:insufficient_symbols`, `:inconsistent_symbol_size`, `:singular`).
+- **Every solution is verified** against the full constraint system (LDPC/HDPC rows plus the received-symbol rows) before returning — a successful decode is always consistent with the received data; unverifiable solves return `{:error, :singular}` (never corrupt data). With extra symbols available, sliding-window subsets are tried (bounded attempts).
 
 ## Parameter Distinction: K vs K'
 
-- `params.k` = K' = intermediate symbol count (includes LDPC/HDPC padding)
-- `params.k - params.s - params.h` = K = original source symbol count
+- `params.k` = K' = intermediate/extended source block symbol count
+- `params.l` = `params.k + params.s + params.h` = constraint matrix size L
+- Decoder needs `params.l - params.s - params.h` = `params.k` = K' distinct symbols
+- K is the **user-supplied** `k` argument to `encode`/`decode`/`StreamingDecoder.new` (K ≤ K'); it is *not* `params.k - params.s - params.h`
 - Source ISIs: `0..K-1`; Repair ISIs start at `K'`
 
 ## Interop with cberner/raptorq 2.x
 
 Verified conformant under:
 - `sub_blocks = 1`, `symbol_alignment = 1`
-- Data length exact multiple of `symbol_size`, `symbol_size >= 2`
+- Data length exact multiple of `symbol_size`, `symbol_size >= 2` (cberner limit; this library itself allows 1)
 - Shared ISI space: source `0..K-1`, repair `K'..∞`
 
 Reference vectors: `test/fixtures/cberner_interop_vectors.txt` + `test/raptorq_interop_test.exs`.
