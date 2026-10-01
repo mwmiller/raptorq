@@ -192,4 +192,61 @@ defmodule RaptorqSolverTest do
     {:ok, decoded} = Raptorq.decode(received, 10, byte_size(data))
     assert decoded == data
   end
+
+  test "singular system returns {:error, :singular}" do
+    {rows, params} = ConstraintMatrix.build(10)
+    %{l: l} = params
+
+    # Duplicating a row makes the L×L system rank-deficient
+    dup_rows = List.replace_at(rows, length(rows) - 1, hd(rows))
+    zero = :binary.copy(<<0>>, @symbol_size)
+    d_syms = List.duplicate(zero, l)
+
+    assert {:error, :singular} = Solver.solve(dup_rows, params, d_syms)
+  end
+
+  test "all-zero row system returns {:error, :singular}" do
+    {_rows, params} = ConstraintMatrix.build(10)
+    %{l: l} = params
+
+    zero = :binary.copy(<<0>>, @symbol_size)
+    zero_rows = for _ <- 1..l, do: %{}
+
+    assert {:error, :singular} = Solver.solve(zero_rows, params, List.duplicate(zero, l))
+  end
+
+  describe "verify_solution/3" do
+    setup do
+      {rows, params} = ConstraintMatrix.build(10)
+      %{s: s, h: h} = params
+      zero = :binary.copy(<<0>>, @symbol_size)
+      source = for _ <- 1..params.k, do: :crypto.strong_rand_bytes(@symbol_size)
+      d_syms = List.duplicate(zero, s + h) ++ source
+      {:ok, c_syms} = Solver.solve(rows, params, d_syms)
+      %{rows: rows, d_syms: d_syms, c_syms: c_syms}
+    end
+
+    test "accepts a solution satisfying every row", ctx do
+      assert :ok = Solver.verify_solution(ctx.c_syms, ctx.rows, ctx.d_syms)
+    end
+
+    test "rejects a corrupted solution", ctx do
+      bad =
+        Enum.map(ctx.c_syms, fn
+          <<b, rest::binary>> -> <<Bitwise.bxor(b, 1), rest::binary>>
+        end)
+
+      assert {:error, :singular} = Solver.verify_solution(bad, ctx.rows, ctx.d_syms)
+    end
+
+    test "rejects mismatched row and D counts", ctx do
+      assert {:error, :singular} = Solver.verify_solution(ctx.c_syms, ctx.rows, tl(ctx.d_syms))
+    end
+
+    test "rejects rows referencing out-of-range columns", ctx do
+      bad_rows = [%{999_999 => <<1>>} | tl(ctx.rows)]
+
+      assert {:error, :singular} = Solver.verify_solution(ctx.c_syms, bad_rows, ctx.d_syms)
+    end
+  end
 end

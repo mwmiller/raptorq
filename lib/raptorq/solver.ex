@@ -22,14 +22,26 @@ defmodule Raptorq.Solver do
 
   defstruct A: [], D: [], c: [], d: [], i: 0, u: 0, L: 0, M: 0, params: %{}
 
+  # Same shape as Raptorq.ConstraintMatrix.row/0; private so the specs do
+  # not link against a hidden module in the generated docs.
+  @typep row :: %{optional(non_neg_integer()) => binary()}
+
   @doc """
   Solve A·C = D using the 5-phase algorithm.
   """
+  @spec solve([row()], Raptorq.siop_params(), [binary()]) ::
+          {:ok, [binary()]} | {:error, :singular}
   def solve(constraint_rows, params, d_symbols) do
     %{l: l, p: p} = params
     m = length(constraint_rows)
 
-    a = Enum.map(constraint_rows, fn row -> Map.new(row) end)
+    # Constraint rows may contain explicit <<0>> entries (e.g. from GF(2^8)
+    # cancellations). They are mathematically absent, but stored zeros break
+    # the solver's sparse invariants, so drop them up front.
+    a =
+      Enum.map(constraint_rows, fn row ->
+        row |> Map.new() |> Map.reject(fn {_k, v} -> v == <<0>> end)
+      end)
 
     solver = %__MODULE__{
       A: a,
@@ -43,21 +55,65 @@ defmodule Raptorq.Solver do
       params: params
     }
 
-    case first_phase(solver) do
-      {:ok, s1} ->
-        case second_phase(s1) do
-          {:ok, s2} ->
-            s3 = third_phase(s2)
-            s5 = fifth_phase(s3)
-            s4 = fourth_phase(s5)
-            {:ok, extract_intermediate(s4)}
+    # Phases 3-5 throw {:singular, col} on a broken pivot; normalize all
+    # singular reports into an error tuple.
+    try do
+      case first_phase(solver) do
+        {:ok, s1} ->
+          case second_phase(s1) do
+            {:ok, s2} ->
+              s3 = third_phase(s2)
+              s5 = fifth_phase(s3)
+              s4 = fourth_phase(s5)
+              {:ok, extract_intermediate(s4)}
 
-          {:error, reason} ->
-            {:error, reason}
-        end
+            {:error, reason} ->
+              {:error, reason}
+          end
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    catch
+      {:singular, _col} -> {:error, :singular}
+    end
+  end
+
+  @doc """
+  Verify that `c_syms` satisfies every row of the system, i.e.
+  row · C == D for all rows (constraint and received rows alike).
+
+  A solve can only be trusted if the candidate satisfies the whole
+  system — checking just the received encoding rows would miss
+  solutions that violate the LDPC/HDPC constraint rows.
+  """
+  @spec verify_solution([binary()], [row()], [binary()]) ::
+          :ok | {:error, :singular}
+  def verify_solution(c_syms, rows, d_syms) do
+    l = length(c_syms)
+
+    holds? =
+      length(rows) == length(d_syms) and
+        rows
+        |> Enum.zip(d_syms)
+        |> Enum.all?(fn {row, d} -> row_value(c_syms, row, l, byte_size(d)) == d end)
+
+    if holds?, do: :ok, else: {:error, :singular}
+  end
+
+  defp row_value(c_syms, row, l, sym_size) do
+    zero = :binary.copy(<<0>>, sym_size)
+
+    Enum.reduce_while(row, {:ok, zero}, fn {col, val}, {:ok, acc} ->
+      if is_integer(col) and col >= 0 and col < l do
+        {:cont, {:ok, Octet.sadd(acc, Octet.smul(Enum.at(c_syms, col), val))}}
+      else
+        {:halt, :invalid}
+      end
+    end)
+    |> case do
+      {:ok, sum} -> sum
+      :invalid -> :invalid
     end
   end
 
@@ -156,11 +212,24 @@ defmodule Raptorq.Solver do
         # Graph-theoretic selection
         select_graph_row(a, rows_with_2, v_start, v_end)
       else
-        Enum.min_by(candidates, &map_size(Enum.at(a, &1, %{})))
+        pick_sparsest_row(a, candidates, v_start, v_end)
       end
     else
-      Enum.min_by(candidates, &map_size(Enum.at(a, &1, %{})))
+      pick_sparsest_row(a, candidates, v_start, v_end)
     end
+  end
+
+  # RFC 6330 §5.4.2.2: the chosen row must have exactly r non-zero V
+  # entries (r is the minimum). Selecting by total row size instead can
+  # pick a row with more V entries than r; the caller then advances the
+  # V/U boundary by r-1 while arrange_columns moves more columns than
+  # that, leaving stray V entries in the I block and corrupting every
+  # later phase. Tie-break on total sparsity for stable selection.
+  defp pick_sparsest_row(a, candidates, v_start, v_end) do
+    Enum.min_by(candidates, fn row ->
+      row_map = Enum.at(a, row, %{})
+      {v_count(a, row, v_start, v_end), map_size(row_map)}
+    end)
   end
 
   defp select_graph_row(a, rows, v_start, v_end) do
@@ -357,76 +426,34 @@ defmodule Raptorq.Solver do
     left ++ [vj | mid2] ++ [vi | right]
   end
 
-  @doc false
-  def run_phases(rows, params, d_syms) do
-    %{l: l, p: p} = params
-    m = length(rows)
-    a = Enum.map(rows, fn row -> Map.new(row) end)
-
-    s = %__MODULE__{
-      A: a,
-      D: d_syms,
-      c: Enum.to_list(0..(l - 1)),
-      d: Enum.to_list(0..(m - 1)),
-      i: 0,
-      u: p,
-      L: l,
-      M: m,
-      params: params
-    }
-
-    case first_phase(s) do
-      {:ok, s1} ->
-        case second_phase(s1) do
-          {:ok, s2} ->
-            s3 = third_phase(s2)
-            s5p = fifth_phase(s3)
-            s4 = fourth_phase(s5p)
-            {:ok, s1, s2, s3, s4, s5p, Map.get(s4, :c)}
-
-          err ->
-            err
-        end
-
-      err ->
-        err
-    end
-  end
-
   # ── Phase 2 — §5.4.2.3 ────────────────────────────────────────────────
 
   defp second_phase(%{u: u} = solver) when u == 0, do: {:ok, truncate_matrix(solver)}
 
   defp second_phase(solver) do
-    %{i: i, u: u, L: l, M: m, A: a, D: d} = solver
+    %{i: i, u: u, L: l, M: m, A: a, D: d, d: d_perm} = solver
     u_start = l - u
-
-    # Step0: Eliminate I-set entries from U-lower rows
-    # After Phase 1, rows i..M-1 may have non-zero entries in I columns 0..i-1
-    # (introduced by column swaps in Phase 1).  Use I-rows to eliminate them.
-    {a, d} = eliminate_i_columns(a, d, i, m)
-
-    solver = %{solver | A: a, D: d}
-    %{A: a, D: d, i: i, u: u, L: l, M: m, d: d_perm} = solver
-
-    # Extract U-lower rows (positions i..M-1)
     u_lower_pos = Enum.to_list(i..(m - 1))
 
-    u_lower =
-      Enum.map(u_lower_pos, fn pos ->
-        row_map = Enum.at(a, pos, %{})
-        for col <- u_start..(l - 1), do: Map.get(row_map, col, <<0>>)
-      end)
-
-    # Dense GE on U matrix (track ops, apply to A and D)
+    # Dense GE on U matrix (track ops, apply to A and D). The I-column
+    # cleanup runs inside the try so a broken I-block invariant is
+    # reported as :singular instead of crashing.
     reduce_result =
       try do
+        {a, d} = eliminate_i_columns(a, d, i, m)
+
+        u_lower =
+          Enum.map(u_lower_pos, fn pos ->
+            row_map = Enum.at(a, pos, %{})
+            for col <- u_start..(l - 1), do: Map.get(row_map, col, <<0>>)
+          end)
+
         {:ok,
          Enum.reduce(0..(u - 1), {u_lower, a, d, d_perm}, fn col, acc ->
            ge_column(col, acc, u, u_lower_pos)
          end)}
       catch
-        {:singular, col} -> {:error, {:singular, col}}
+        {:singular, _col} -> {:error, :singular}
       end
 
     case reduce_result do
@@ -448,9 +475,20 @@ defmodule Raptorq.Solver do
       {a, d}
     else
       Enum.reduce(0..(i - 1), {a, d}, fn i_col, {a_acc, d_acc} ->
-        pivot_val = a_acc |> Enum.at(i_col, %{}) |> Map.get(i_col, <<1>>)
+        pivot_val = i_pivot!(a_acc, i_col)
         Enum.reduce(i..(m - 1), {a_acc, d_acc}, &eliminate_i_row(&2, &1, i_col, pivot_val))
       end)
+    end
+  end
+
+  # The I block is required to have a non-zero diagonal. A missing or
+  # explicitly zero pivot means the invariant was broken; report
+  # singular rather than dividing by zero or silently corrupting D.
+  defp i_pivot!(a, i_col) do
+    case a |> Enum.at(i_col, %{}) |> Map.get(i_col) do
+      nil -> throw({:singular, i_col})
+      <<0>> -> throw({:singular, i_col})
+      pivot_val -> pivot_val
     end
   end
 
@@ -669,17 +707,31 @@ defmodule Raptorq.Solver do
       a = Map.get(s2, :A)
       val = a |> Enum.at(row, %{}) |> Map.get(col, <<0>>)
 
-      if val != <<0>> do
-        pivot_val = a |> Enum.at(col, %{}) |> Map.get(col, <<1>>)
+      if val == <<0>> do
+        s2
+      else
+        clear_i_entry(s2, row, col, val)
+      end
+    end)
+  end
+
+  defp clear_i_entry(s2, row, col, val) do
+    a = Map.get(s2, :A)
+
+    case a |> Enum.at(col, %{}) |> Map.get(col) do
+      nil ->
+        throw({:singular, col})
+
+      <<0>> ->
+        throw({:singular, col})
+
+      pivot_val ->
         sc = Octet.odiv(val, pivot_val)
         d = Map.get(s2, :D)
         a2 = fma(a, col, row, sc)
         d2 = d |> List.update_at(row, &Octet.sadd(&1, Octet.smul(Enum.at(d, col), sc)))
         %{s2 | A: a2, D: d2}
-      else
-        s2
-      end
-    end)
+    end
   end
 
   # ── Extract intermediate symbols ──────────────────────────────────────
