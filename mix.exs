@@ -32,6 +32,7 @@ defmodule Raptorq.MixProject do
       {:ex_doc, "~> 0.38", only: :dev, runtime: false},
       {:makeup, "~> 1.1", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:usage_rules, "~> 1.2", only: [:dev, :test]}
     ]
   end
