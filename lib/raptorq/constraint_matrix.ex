@@ -3,6 +3,9 @@ defmodule Raptorq.ConstraintMatrix do
 
   alias Raptorq.{Generators, Octet, SIOP}
 
+  @typedoc "A constraint-matrix row: a sparse map of column index to octet."
+  @type row :: %{optional(non_neg_integer()) => binary()}
+
   @doc """
   Build the full constraint matrix A as a list of L row maps.
 
@@ -12,6 +15,8 @@ defmodule Raptorq.ConstraintMatrix do
 
   Returns `{rows, params}`.
   """
+  @spec build(pos_integer()) :: {[row()], Raptorq.siop_params()}
+  @spec build(pos_integer(), [non_neg_integer()] | nil) :: {[row()], Raptorq.siop_params()}
   def build(k_prime, encoded_isis \\ nil) do
     params = SIOP.values_for(k_prime, :close)
     %{b: b, s: s, h: h, w: w, p: p, p1: p1, k: k} = params
@@ -32,6 +37,7 @@ defmodule Raptorq.ConstraintMatrix do
   #   2 from G_LDPC,2 (second loop, PI symbol relationships)
 
   @doc false
+  @spec build_ldpc_rows(integer(), integer(), integer(), integer()) :: [row()]
   def build_ldpc_rows(b, s, w, p) do
     # G_LDPC,1: for each source symbol C[i] (0..B-1), three LDPC row updates
     #   a = 1 + floor(i/S), start at b = i%S, then b = (b+a)%S twice
@@ -78,6 +84,7 @@ defmodule Raptorq.ConstraintMatrix do
   # HDPC row i).
 
   @doc false
+  @spec build_hdpc_rows(integer(), integer(), integer()) :: [row()]
   def build_hdpc_rows(k, s, h) do
     kps = k + s
     alpha = <<2>>
@@ -131,6 +138,8 @@ defmodule Raptorq.ConstraintMatrix do
   #   5. Repeat d1-1 times: b1 = (b1 + a1) % p1 with boundary check
 
   @doc false
+  @spec build_enc_rows(pos_integer(), integer(), integer(), integer(), [non_neg_integer()]) ::
+          [row()]
   def build_enc_rows(k, w, p, p1, isis) do
     for x <- isis do
       {d, a, b, d1, a1, b1} = Generators.tuple(k, x)
@@ -184,6 +193,7 @@ defmodule Raptorq.ConstraintMatrix do
 
   # Used in tests for verification
   @doc false
+  @spec rows_to_mapset([row()]) :: [MapSet.t(non_neg_integer())]
   def rows_to_mapset(rows) do
     Enum.map(rows, fn row -> MapSet.new(Map.keys(row)) end)
   end

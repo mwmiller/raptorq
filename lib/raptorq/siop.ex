@@ -44,6 +44,10 @@ defmodule Raptorq.SIOP do
   - `:exact`: Returns the exact match for k.
   - `:close`: Returns the closest match for k which is greater than or equal to k.
   """
+  @type strategy :: :exact | :close
+
+  @spec values_for(pos_integer()) :: Raptorq.siop_params()
+  @spec values_for(pos_integer(), strategy()) :: Raptorq.siop_params()
   def values_for(k, strategy \\ :exact) do
     match_fn =
       case strategy do

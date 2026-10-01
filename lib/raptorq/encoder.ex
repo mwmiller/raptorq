@@ -20,6 +20,7 @@ defmodule Raptorq.Encoder do
 
   Returns the encoding symbol as a binary (same byte size as a C symbol).
   """
+  @spec encode_symbol([binary()], Raptorq.siop_params(), Raptorq.isi()) :: binary()
   def encode_symbol([first | _] = c_syms, params, isi) do
     %{k: k, w: w, p: p, p1: p1} = params
     sym_size = byte_size(first)

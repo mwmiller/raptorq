@@ -2,12 +2,19 @@ defmodule Raptorq.Octet do
   @moduledoc false
   import Bitwise
 
+  @typedoc "A single byte in GF(2⁸)."
+  @type octet :: <<_::8>>
+
+  @typedoc "A multi-byte symbol (all symbols in a block share a size)."
+  @type symbol :: binary()
+
   @doc """
   Add two octets
 
   iex> Raptorq.Octet.oadd(<<254>>, <<2>>)
   <<252>>
   """
+  @spec oadd(octet(), octet()) :: octet()
   # I dislike using a guard here, but it shuts up the
   # compiler about the unused variable.
   def oadd(<<u>>, <<v>>) when u == v, do: <<0>>
@@ -21,6 +28,7 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.osub(<<1>>, <<1>>)
   <<0>>
   """
+  @spec osub(octet(), octet()) :: octet()
 
   def osub(u, v), do: oadd(u, v)
 
@@ -30,6 +38,8 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.omul(<<255>>, <<1>>)
   <<255>>
   """
+  @spec omul(octet(), octet()) :: octet()
+
   def omul(_, <<0>>), do: <<0>>
   def omul(<<0>>, _), do: <<0>>
   def omul(u, v), do: oexp(olog(u) + olog(v))
@@ -39,6 +49,8 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.odiv(<<255>>, <<2>>)
   <<241>>
   """
+  @spec odiv(octet(), octet()) :: octet()
+
   def odiv(_, <<0>>), do: raise(ArgumentError, "Division by zero")
   def odiv(<<0>>, _), do: <<0>>
   def odiv(u, v), do: oexp(olog(u) - olog(v) + 255)
@@ -51,6 +63,8 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.olog(<<127>>)
   87
   """
+  @spec olog(octet()) :: non_neg_integer()
+
   def olog(octet)
 
   :code.priv_dir(:raptorq)
@@ -72,6 +86,8 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.oexp(42)
   <<181>>
   """
+  @spec oexp(non_neg_integer()) :: octet()
+
   def oexp(index)
 
   :code.priv_dir(:raptorq)
@@ -91,6 +107,8 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.sadd(<<1, 2, 3>>, <<4, 5, 6>>)
   <<5, 7, 5>>
   """
+  @spec sadd(symbol(), symbol()) :: symbol()
+
   def sadd(s1, s2) when byte_size(s1) == byte_size(s2) do
     :crypto.exor(s1, s2)
   end
@@ -103,6 +121,8 @@ defmodule Raptorq.Octet do
   iex> Raptorq.Octet.smul(<<1, 2, 3>>, <<2>>)
   <<2, 4, 6>>
   """
+  @spec smul(symbol(), octet()) :: symbol()
+
   def smul(s, octet) when is_binary(s) and is_binary(octet) and byte_size(octet) == 1 do
     rsmul(s, octet, <<>>)
   end
@@ -110,6 +130,7 @@ defmodule Raptorq.Octet do
   def smul(s, octet),
     do: raise(ArgumentError, "Symbol must be binary with single octet scalar: #{s}, #{octet}")
 
+  @spec rsmul(symbol(), octet(), symbol()) :: symbol()
   def rsmul(<<>>, _octet, acc), do: acc
 
   def rsmul(<<b::binary-size(1), rest::binary>>, s2, acc) do

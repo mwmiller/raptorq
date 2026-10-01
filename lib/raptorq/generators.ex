@@ -5,6 +5,11 @@ defmodule Raptorq.Generators do
   import Raptorq.Lookup
   alias Raptorq.{Octet, SIOP}
 
+  @typedoc "The `{d, a, b, d1, a1, b1}` values produced by `tuple/2`."
+  @type lt_tuple ::
+          {non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer(),
+           non_neg_integer(), non_neg_integer()}
+
   # Regex cannot be module attributes as of Elixir 1.19
   # This is kept as a "once used variable" for clarity.
   key_re = ~r/(?<i0>\d+)[^\d]+(?<f0>\d+)[^\d]+((?<i1>\d+)[^\d]+(?<f1>\d+))?\s/
@@ -44,6 +49,7 @@ defmodule Raptorq.Generators do
   - `v`: Non-negative integer between 0 and 1,048,576 (2^20)
   - `k_prime`: Non-negative integer in the SIOP table
   """
+  @spec deg(non_neg_integer(), integer()) :: integer()
 
   def deg(v, k_prime)
       when is_integer(v) and v >= 0 and v <= 1_048_576 and is_integer(k_prime) do
@@ -66,6 +72,7 @@ defmodule Raptorq.Generators do
     - `m`: Positive integer limit for the random number generation.
 
   """
+  @spec rand(non_neg_integer(), 0..255, pos_integer()) :: non_neg_integer()
   def rand(y, i, m)
 
   def rand(y, i, m)
@@ -95,6 +102,7 @@ defmodule Raptorq.Generators do
     - `k_prime`: source symbols in the extended source block
     - `x`: an ISI
   """
+  @spec tuple(integer(), integer()) :: lt_tuple()
   def tuple(k_prime, x) when is_integer(k_prime) and is_integer(x) do
     %{j: j, w: w, p1: p1} = SIOP.values_for(k_prime, :exact)
     a_0 = 53_591 + j * 997
@@ -131,6 +139,7 @@ defmodule Raptorq.Generators do
 
     Delegates to `Raptorq.Encoder.encode_symbol/3`.
   """
+  @spec enc(pos_integer(), [binary()], lt_tuple()) :: binary()
   def enc(k_prime, symbols, {d, a, b, d1, a1, b1}) do
     %{w: w, p: p, p1: p1} = params = SIOP.values_for(k_prime, :exact)
 

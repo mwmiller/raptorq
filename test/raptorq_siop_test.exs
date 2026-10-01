@@ -34,5 +34,11 @@ defmodule RaptorqSIOPTest do
     assert_raise ArgumentError, fn -> values_for(56_404) end
     assert_raise ArgumentError, fn -> values_for(56_404, :close) end
     assert_raise ArgumentError, fn -> values_for(9, :exact) end
+    assert_raise ArgumentError, fn -> values_for(10, :nearest) end
+  end
+
+  test "values_for rejects non-positive k with :exact" do
+    assert_raise ArgumentError, fn -> values_for(0) end
+    assert_raise ArgumentError, fn -> values_for(-1, :exact) end
   end
 end

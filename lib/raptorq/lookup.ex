@@ -2,6 +2,12 @@ defmodule Raptorq.Lookup do
   @moduledoc false
   # I could do some extra magic here to make them match
   # but I don't think it's worth it, and it would reduce flexibility
+
+  @spec v0(0..255) :: integer()
+  @spec v1(0..255) :: integer()
+  @spec v2(0..255) :: integer()
+  @spec v3(0..255) :: integer()
+
   for {file, which} <- [
         {"V0.entries", :v0},
         {"V1.entries", :v1},

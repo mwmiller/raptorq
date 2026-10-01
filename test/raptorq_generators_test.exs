@@ -2,6 +2,7 @@ defmodule RaptorqGeneratorsTest do
   use ExUnit.Case
   doctest Raptorq.Generators
   import Raptorq.Generators
+  alias Raptorq.{ConstraintMatrix, Encoder}
 
   test "rand" do
     assert rand(1, 1, 1) == 0
@@ -43,5 +44,28 @@ defmodule RaptorqGeneratorsTest do
     assert tuple(10, 0) == {2, 4, 9, 2, 5, 1}
     assert tuple(18, 10) == {18, 26, 16, 2, 10, 7}
     assert tuple(1777, 10) == {3, 1763, 1006, 2, 66, 55}
+  end
+
+  test "enc matches Encoder.encode_symbol for the same tuple" do
+    kp = 10
+    {_rows, params} = ConstraintMatrix.build(kp)
+    c_syms = for _ <- 1..params.l, do: :crypto.strong_rand_bytes(4)
+
+    for isi <- [0, 1, 9, 10, 100, 99_999] do
+      lt = tuple(kp, isi)
+
+      assert enc(kp, c_syms, lt) == Encoder.encode_symbol(c_syms, params, isi),
+             "enc/3 mismatch at ISI #{isi}"
+    end
+  end
+
+  test "enc raises when symbol count does not match l" do
+    kp = 10
+    {_rows, params} = ConstraintMatrix.build(kp)
+    short = for _ <- 1..(params.l - 1), do: :crypto.strong_rand_bytes(4)
+
+    assert_raise ArgumentError, ~r/List length must be equal to l/, fn ->
+      enc(kp, short, tuple(kp, 0))
+    end
   end
 end
